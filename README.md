@@ -87,12 +87,7 @@ venv\Scripts\activate      # On Windows
 pip install -r requirements.txt
 ```
 
-Create a `.env` file inside `backend/`:
-```env
-DATABASE_URL=sqlite:///./khetseva.db
-SECRET_KEY=khetseva-secret-key-change-in-prod-hackathon-2026
-GEMINI_API_KEY=your-gemini-api-key-here # Optional
-```
+Create a `.env` file inside `backend/` with your local database and credentials.
 
 Start the server:
 ```bash
