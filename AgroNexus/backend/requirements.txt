@@ -1,10 +1,12 @@
 fastapi
 uvicorn
 sqlalchemy
-psycopg2-binary
 python-dotenv
 pydantic
 scikit-learn
 ortools
 requests
 pandas
+google-genai
+passlib[bcrypt]
+python-jose[cryptography]
