@@ -47,6 +47,8 @@ class FinancialProfile(Base):
     land_size_acres = Column(Float)
     primary_crop = Column(String)
     financial_risk_score = Column(Float, nullable=True)  # Calculated by ML
+    financial_risk_level = Column(String, nullable=True)  # High/Medium/Low from agent
+    financial_thoughts = Column(Text, nullable=True)      # Financial agent reasoning
 
     farmer = relationship("Farmer", back_populates="financial_profile")
 
@@ -62,6 +64,8 @@ class EnvironmentalData(Base):
     historical_disaster_risk = Column(String)  # 'High', 'Medium', 'Low'
     last_api_update = Column(DateTime, default=datetime.utcnow)
     disaster_risk_score = Column(Float, nullable=True)  # Calculated by ML
+    disaster_risk_level = Column(String, nullable=True)  # High/Medium/Low from agent
+    disaster_thoughts = Column(Text, nullable=True)      # Disaster agent reasoning
 
     farmer = relationship("Farmer", back_populates="environmental_data")
 
@@ -76,5 +80,7 @@ class CompoundRisk(Base):
     compound_score = Column(Float, nullable=True)
     xai_explanation = Column(Text, nullable=True)
     status = Column(String)  # 'Safe', 'Warning', 'Critical'
+    scheme_thoughts = Column(Text, nullable=True)          # Scheme agent reasoning
+    eligible_schemes_json = Column(Text, nullable=True)    # JSON string containing eligible schemes
 
     farmer = relationship("Farmer", back_populates="compound_risk")
