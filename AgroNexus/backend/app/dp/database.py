@@ -1,15 +1,20 @@
 import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the backend directory (two levels up from this file)
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Read DATABASE_URL from .env file
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set. Please add it to your .env file.")
+    raise RuntimeError(
+        f"DATABASE_URL is not set. Please add it to your .env file at: {env_path}"
+    )
 
 # Create the SQLAlchemy Engine with pool_pre_ping for resilient connections
 connect_args = {}

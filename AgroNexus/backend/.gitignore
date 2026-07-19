@@ -5,6 +5,7 @@ __pycache__/
 venv/
 .env
 test.db
+*.db
 
 # Node
 node_modules/

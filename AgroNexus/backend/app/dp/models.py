@@ -1,8 +1,13 @@
+
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text
+
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 from .database import Base
+
+
+
 
 # Generate UUIDs automatically
 def generate_uuid():
