@@ -8,3 +8,5 @@ scikit-learn
 ortools
 requests
 pandas
+pyjwt
+passlib[bcrypt]
