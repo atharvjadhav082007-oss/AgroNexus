@@ -1,77 +1,72 @@
+"""
+KhetSeva Auth Service — Password hashing (bcrypt) + JWT tokens (python-jose).
+"""
+
 import os
-import hashlib
-import hmac
-import json
-import base64
 from datetime import datetime, timedelta
 from typing import Optional
 
+from jose import jwt, JWTError
+
 SECRET_KEY = os.getenv("SECRET_KEY", "khetseva-secret-key-change-in-prod-hackathon-2026")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_DAYS = 2
+
+import bcrypt
 
 def hash_password(password: str) -> str:
-    """Hash password using a salt and SHA256."""
-    salt = "khetseva-salt-static-secure-1092"
-    hashed = hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
-    return hashed
+    """Hash a password using native bcrypt."""
+    pw_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(pw_bytes, salt)
+    return hashed.decode('utf-8')
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password by comparing hashes."""
-    return hash_password(plain_password) == hashed_password
+    """Verify a plain password against a bcrypt hash.
+    Also handles legacy SHA256 hashes for backward compatibility.
+    """
+    # Try bcrypt first
+    try:
+        pw_bytes = plain_password.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        if bcrypt.checkpw(pw_bytes, hashed_bytes):
+            return True
+    except Exception:
+        pass
+
+    # Fallback: check legacy SHA256 hash (for existing users before migration)
+    import hashlib
+    legacy_salt = "khetseva-salt-static-secure-1092"
+    legacy_hash = hashlib.sha256((plain_password + legacy_salt).encode("utf-8")).hexdigest()
+    if legacy_hash == hashed_password:
+        return True
+
+    return False
+
+
+def needs_rehash(hashed_password: str) -> bool:
+    """Check if a password hash needs to be upgraded to bcrypt."""
+    return not (hashed_password.startswith("$2a$") or hashed_password.startswith("$2b$"))
+
+
+
+# ─────────────────────────────────────────────
+# JWT Tokens (python-jose)
+# ─────────────────────────────────────────────
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a lightweight signed JWT-like token (no external dependencies)."""
+    """Create a signed JWT access token."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=2)
-        
-    to_encode.update({"exp": expire.isoformat()})
-    
-    payload_bytes = json.dumps(to_encode).encode("utf-8")
-    payload_b64 = base64.urlsafe_b64encode(payload_bytes).decode("utf-8")
-    
-    # Calculate HMAC SHA256 signature
-    sig = hmac.new(
-        SECRET_KEY.encode("utf-8"),
-        payload_b64.encode("utf-8"),
-        hashlib.sha256
-    ).hexdigest()
-    
-    return f"{payload_b64}.{sig}"
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def decode_access_token(token: str) -> Optional[dict]:
-    """Decode and verify a signed token."""
+    """Decode and verify a JWT token. Returns payload dict or None."""
     try:
-        parts = token.split(".")
-        if len(parts) != 2:
-            return None
-            
-        payload_b64, signature = parts
-        
-        # Verify HMAC signature
-        expected_sig = hmac.new(
-            SECRET_KEY.encode("utf-8"),
-            payload_b64.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(expected_sig, signature):
-            return None
-            
-        # Decode and parse JSON payload
-        payload_bytes = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
-        payload = json.loads(payload_bytes.decode("utf-8"))
-        
-        # Verify expiration
-        exp_str = payload.get("exp")
-        if not exp_str:
-            return None
-            
-        expire_time = datetime.fromisoformat(exp_str)
-        if datetime.utcnow() > expire_time:
-            return None
-            
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except Exception:
+    except JWTError:
         return None

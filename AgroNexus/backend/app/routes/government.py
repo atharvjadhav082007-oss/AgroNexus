@@ -1,21 +1,35 @@
 """
 KhetSeva Government / Officer Routes — aggregate dashboard + optimization.
+Protected by officer API key.
 """
 
+import os
 import json
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db import models
 from app.services.agents import OptimizationAgent
 from app import schemas
+from app.errors import OfficerAccessDeniedError
 
 router = APIRouter(prefix="/api/government", tags=["Government"])
 
+OFFICER_API_KEY = os.getenv("OFFICER_API_KEY", "khetseva-officer-2026")
+
+
+def verify_officer(x_officer_key: str = Header(..., description="Officer access key")):
+    """Dependency to verify officer API key from request header."""
+    if x_officer_key != OFFICER_API_KEY:
+        raise OfficerAccessDeniedError()
+
 
 @router.get("/dashboard", response_model=schemas.GovernmentDashboardResponse)
-def get_government_dashboard(db: Session = Depends(get_db)):
+def get_government_dashboard(
+    db: Session = Depends(get_db),
+    _officer: None = Depends(verify_officer),
+):
     """Returns all registered farmers with their risk profiles for the officer/NGO panel."""
     farmers = db.query(models.Farmer).all()
     overview = []
@@ -65,7 +79,11 @@ def get_government_dashboard(db: Session = Depends(get_db)):
 
 
 @router.post("/optimize", response_model=schemas.OptimizationResponse)
-def run_budget_optimization(req: schemas.OptimizationRequest, db: Session = Depends(get_db)):
+def run_budget_optimization(
+    req: schemas.OptimizationRequest,
+    db: Session = Depends(get_db),
+    _officer: None = Depends(verify_officer),
+):
     """Invokes OptimizationAgent (OR-Tools CP-SAT) for relief fund allocation."""
     farmers = db.query(models.Farmer).all()
     farmers_list = []

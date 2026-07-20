@@ -4,33 +4,17 @@ KhetSeva Risk Routes — per-farmer risk endpoints.
 
 import json
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db import models
-from app.services.auth import decode_access_token
+from app.deps import get_current_farmer
 from app.services.weather import get_weather_and_disaster
 from app.services.agents import FinancialAgent, DisasterAgent, compute_compound_risk
 from app import schemas
+from app.errors import OnboardingIncompleteError
 
 router = APIRouter(prefix="/api/risk", tags=["Risk"])
-
-security = HTTPBearer()
-
-
-def get_current_farmer(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> models.Farmer:
-    token = credentials.credentials
-    payload = decode_access_token(token)
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    farmer = db.query(models.Farmer).filter(models.Farmer.id == payload["sub"]).first()
-    if not farmer:
-        raise HTTPException(status_code=401, detail="Farmer not found")
-    return farmer
 
 
 @router.get("/financial")
@@ -47,7 +31,7 @@ def get_financial_risk(
     ).first()
 
     if not farm or not fin:
-        raise HTTPException(status_code=400, detail="Complete onboarding first.")
+        raise OnboardingIncompleteError("onboarding")
 
     crop = farm.crops.split(",")[0].strip() if farm.crops else "Rice"
 
@@ -106,7 +90,7 @@ def get_compound_risk(
     ).order_by(models.RiskScore.computed_at.desc()).first()
 
     if not latest:
-        raise HTTPException(status_code=400, detail="No risk score computed yet. Complete onboarding first.")
+        raise OnboardingIncompleteError("risk score computation")
 
     # Parse factor breakdowns
     financial_factors = []

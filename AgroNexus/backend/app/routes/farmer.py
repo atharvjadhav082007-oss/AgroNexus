@@ -1,46 +1,21 @@
 """
-KhetSeva Farmer Routes — 3-step onboarding + dashboard.
+KhetSeva Farmer Routes — 3-step onboarding + dashboard + profile update.
 """
 
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.db import models
-from app.services.auth import decode_access_token
+from app.deps import get_current_farmer
 from app.services.weather import get_weather_and_disaster
 from app.services.agents import FinancialAgent, DisasterAgent, GovSchemeAgent, compute_compound_risk
 from app.services.recommendations import generate_recommendations
 from app import schemas
+from app.errors import OnboardingIncompleteError
 
 router = APIRouter(prefix="/api/farmer", tags=["Farmer"])
-
-security = HTTPBearer()
-
-
-def get_current_farmer(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> models.Farmer:
-    """Dependency to retrieve the logged-in farmer from JWT token."""
-    token = credentials.credentials
-    payload = decode_access_token(token)
-    if not payload or "sub" not in payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    farmer_id = payload["sub"]
-    farmer = db.query(models.Farmer).filter(models.Farmer.id == farmer_id).first()
-    if not farmer:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Farmer not found",
-        )
-    return farmer
 
 
 # ─────────────────────────────────────────────
@@ -118,10 +93,7 @@ def onboarding_step3(
     ).first()
 
     if not farm:
-        raise HTTPException(
-            status_code=400,
-            detail="Please complete Step 2 (farm details) first."
-        )
+        raise OnboardingIncompleteError("Step 2 (farm details)")
 
     crop = farm.crops.split(",")[0].strip() if farm.crops else "Rice"
 
@@ -294,7 +266,7 @@ def get_dashboard(
 
 
 # ─────────────────────────────────────────────
-# Profile (editable)
+# Profile (read)
 # ─────────────────────────────────────────────
 
 @router.get("/profile")
@@ -302,7 +274,7 @@ def get_profile(
     current_user: models.Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
 ):
-    """Return farmer's full profile for editing."""
+    """Return farmer's full profile for viewing."""
     farm = db.query(models.FarmDetails).filter(
         models.FarmDetails.farmer_id == current_user.id
     ).first()
@@ -315,6 +287,95 @@ def get_profile(
         "farmer": schemas.FarmerResponse.model_validate(current_user),
         "farm_details": schemas.FarmDetailsResponse.model_validate(farm) if farm else None,
         "financial_details": schemas.FinancialDetailsResponse.model_validate(fin) if fin else None,
+    }
+
+
+# ─────────────────────────────────────────────
+# Profile Update (edit)
+# ─────────────────────────────────────────────
+
+@router.put("/profile")
+def update_profile(
+    data: schemas.ProfileUpdate,
+    current_user: models.Farmer = Depends(get_current_farmer),
+    db: Session = Depends(get_db),
+):
+    """Update farmer's profile. Accepts partial updates for identity, farm, and financial data."""
+    updated_sections = []
+
+    # ── Update identity & location ──
+    if data.identity:
+        d = data.identity
+        if d.full_name is not None:
+            current_user.full_name = d.full_name
+        if d.pin_code is not None:
+            current_user.pin_code = d.pin_code
+        if d.latitude is not None:
+            current_user.latitude = d.latitude
+        if d.longitude is not None:
+            current_user.longitude = d.longitude
+        updated_sections.append("identity")
+
+    # ── Update farm details ──
+    if data.farm:
+        farm = db.query(models.FarmDetails).filter(
+            models.FarmDetails.farmer_id == current_user.id
+        ).first()
+        if not farm:
+            farm = models.FarmDetails(farmer_id=current_user.id)
+            db.add(farm)
+
+        d = data.farm
+        if d.land_size_acres is not None:
+            farm.land_size_acres = d.land_size_acres
+        if d.ownership_type is not None:
+            farm.ownership_type = d.ownership_type
+        if d.crops is not None:
+            farm.crops = d.crops
+        if d.crop_season is not None:
+            farm.crop_season = d.crop_season
+        if d.irrigation_source is not None:
+            farm.irrigation_source = d.irrigation_source
+        if d.soil_type is not None:
+            farm.soil_type = d.soil_type
+        if d.experience_years is not None:
+            farm.experience_years = d.experience_years
+        updated_sections.append("farm")
+
+    # ── Update financial details ──
+    if data.financial:
+        fin = db.query(models.FinancialDetails).filter(
+            models.FinancialDetails.farmer_id == current_user.id
+        ).first()
+        if not fin:
+            fin = models.FinancialDetails(farmer_id=current_user.id)
+            db.add(fin)
+
+        d = data.financial
+        if d.loan_amount is not None:
+            fin.loan_amount = d.loan_amount
+        if d.loan_source is not None:
+            fin.loan_source = d.loan_source
+        if d.has_insurance is not None:
+            fin.has_insurance = d.has_insurance
+        if d.insurance_scheme is not None:
+            fin.insurance_scheme = d.insurance_scheme
+        if d.income_band is not None:
+            fin.income_band = d.income_band
+        if d.past_crop_loss is not None:
+            fin.past_crop_loss = d.past_crop_loss
+        if d.dependents is not None:
+            fin.dependents = d.dependents
+        updated_sections.append("financial")
+
+    if not updated_sections:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+
+    db.commit()
+
+    return {
+        "message": f"Profile updated: {', '.join(updated_sections)}",
+        "updated_sections": updated_sections,
     }
 
 

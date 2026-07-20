@@ -4,26 +4,39 @@ KhetSeva Auth Routes — signup (Step 1) + login.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import re
 
 from app.db.database import get_db
 from app.db import models
-from app.services.auth import hash_password, verify_password, create_access_token
+from app.services.auth import hash_password, verify_password, create_access_token, needs_rehash
 from app import schemas
+from app.errors import DuplicateRegistrationError, InvalidCredentialsError
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def normalize_phone_number(phone: str) -> str:
+    """Normalize phone numbers to consist of only digits.
+    Strips leading +91, 91, or 0 if the remaining part is 10 digits (common for Indian mobile numbers).
+    """
+    cleaned = re.sub(r'[^\d]', '', phone)
+    if len(cleaned) > 10:
+        if cleaned.startswith("91") and len(cleaned) == 12:
+            cleaned = cleaned[2:]
+        elif cleaned.startswith("0") and len(cleaned) == 11:
+            cleaned = cleaned[1:]
+    return cleaned
 
 
 @router.post("/register", response_model=schemas.Token)
 def register_farmer(farmer_in: schemas.OnboardingStep1, db: Session = Depends(get_db)):
     """Onboarding Step 1: Register with identity & location."""
+    normalized_phone = normalize_phone_number(farmer_in.phone_number)
     existing = db.query(models.Farmer).filter(
-        models.Farmer.phone_number == farmer_in.phone_number
+        models.Farmer.phone_number == normalized_phone
     ).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A farmer with this phone number is already registered.",
-        )
+        raise DuplicateRegistrationError()
 
     hashed = hash_password(farmer_in.password)
 
@@ -40,7 +53,7 @@ def register_farmer(farmer_in: schemas.OnboardingStep1, db: Session = Depends(ge
 
     db_farmer = models.Farmer(
         full_name=farmer_in.full_name,
-        phone_number=farmer_in.phone_number,
+        phone_number=normalized_phone,
         password_hash=hashed,
         pin_code=farmer_in.pin_code,
         latitude=lat,
@@ -57,14 +70,25 @@ def register_farmer(farmer_in: schemas.OnboardingStep1, db: Session = Depends(ge
 
 @router.post("/login", response_model=schemas.Token)
 def login_farmer(credentials: schemas.FarmerLogin, db: Session = Depends(get_db)):
+    """Login with phone number and password. Auto-upgrades legacy SHA256 hashes to bcrypt."""
+    normalized_phone = normalize_phone_number(credentials.phone_number)
     farmer = db.query(models.Farmer).filter(
-        models.Farmer.phone_number == credentials.phone_number
+        models.Farmer.phone_number == normalized_phone
     ).first()
     if not farmer or not verify_password(credentials.password, farmer.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect phone number or password",
-        )
+        raise InvalidCredentialsError()
+
+    # Auto-upgrade legacy SHA256 hashes to bcrypt on successful login
+    try:
+        if needs_rehash(farmer.password_hash):
+            farmer.password_hash = hash_password(credentials.password)
+            db.commit()
+    except Exception:
+        # If the hash is legacy SHA256 (not bcrypt format), rehash it
+        if not farmer.password_hash.startswith("$2"):
+            farmer.password_hash = hash_password(credentials.password)
+            db.commit()
 
     token = create_access_token(data={"sub": farmer.id})
     return {"access_token": token, "token_type": "bearer"}
+

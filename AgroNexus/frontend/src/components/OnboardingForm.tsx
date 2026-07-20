@@ -5,6 +5,24 @@ import { MapPin, Sprout, Wallet, ArrowRight, ArrowLeft, Check, Loader2 } from 'l
 
 const API_URL = 'http://localhost:8000/api';
 
+const extractErrorMessage = (data: any): string => {
+  if (!data) return 'An unexpected error occurred';
+  if (typeof data.detail === 'string') {
+    return data.detail;
+  }
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((err: any) => {
+      const field = err.loc ? err.loc[err.loc.length - 1] : '';
+      const msg = err.msg || 'Invalid value';
+      return field ? `${field}: ${msg}` : msg;
+    }).join(', ');
+  }
+  if (data.message) {
+    return data.message;
+  }
+  return 'An unexpected error occurred';
+};
+
 export default function OnboardingForm() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -53,13 +71,16 @@ export default function OnboardingForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: s1.fullName, phone_number: s1.phoneNumber,
-          password: s1.password, pin_code: s1.pinCode,
-          latitude: s1.latitude, longitude: s1.longitude,
+          full_name: s1.fullName.trim(),
+          phone_number: s1.phoneNumber.replace(/\s+/g, ''),
+          password: s1.password,
+          pin_code: s1.pinCode.replace(/\s+/g, ''),
+          latitude: s1.latitude,
+          longitude: s1.longitude,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Registration failed');
+      if (!res.ok) throw new Error(extractErrorMessage(data));
       setToken(data.access_token);
       localStorage.setItem('token', data.access_token);
       setStep(2);
@@ -82,7 +103,7 @@ export default function OnboardingForm() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to save farm details');
+      if (!res.ok) throw new Error(extractErrorMessage(data));
       setStep(3);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -104,7 +125,7 @@ export default function OnboardingForm() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to compute risk');
+      if (!res.ok) throw new Error(extractErrorMessage(data));
       navigate('/dashboard');
     } catch (e: any) { setError(e.message); }
     setLoading(false);

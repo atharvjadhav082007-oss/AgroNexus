@@ -7,6 +7,7 @@ from app.routes.farmer import router as farmer_router
 from app.routes.risk import router as risk_router
 from app.routes.recommendations import router as recommendations_router
 from app.routes.government import router as government_router
+from app.errors import KhetSevaError, khetseva_error_handler
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -16,14 +17,22 @@ app = FastAPI(
     description="Compound Farmer Risk Platform — Financial fragility + Disaster exposure prediction, 15 days ahead."
 )
 
-# CORS Middleware for React frontend
+# CORS Middleware — locked down to known frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:3000",   # Alt dev port
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register global error handler
+app.add_exception_handler(KhetSevaError, khetseva_error_handler)
 
 # Include route modules
 app.include_router(auth_router)

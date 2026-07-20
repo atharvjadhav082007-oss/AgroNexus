@@ -7,6 +7,24 @@ import Footer from '../../components/Footer/Footer';
 
 const API_URL = 'http://localhost:8000/api';
 
+const extractErrorMessage = (data: any): string => {
+  if (!data) return 'An unexpected error occurred';
+  if (typeof data.detail === 'string') {
+    return data.detail;
+  }
+  if (Array.isArray(data.detail)) {
+    return data.detail.map((err: any) => {
+      const field = err.loc ? err.loc[err.loc.length - 1] : '';
+      const msg = err.msg || 'Invalid value';
+      return field ? `${field}: ${msg}` : msg;
+    }).join(', ');
+  }
+  if (data.message) {
+    return data.message;
+  }
+  return 'An unexpected error occurred';
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
@@ -21,10 +39,13 @@ export default function Login() {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, password }),
+        body: JSON.stringify({
+          phone_number: phone.replace(/\s+/g, ''),
+          password
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Login failed');
+      if (!res.ok) throw new Error(extractErrorMessage(data));
       localStorage.setItem('token', data.access_token);
       navigate('/dashboard');
     } catch (e: any) { setError(e.message); }

@@ -193,6 +193,40 @@ class OptimizationResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────
+# Profile Update (partial edits)
+# ─────────────────────────────────────────────
+
+class ProfileUpdateIdentity(BaseModel):
+    full_name: Optional[str] = None
+    pin_code: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+class ProfileUpdateFarm(BaseModel):
+    land_size_acres: Optional[float] = None
+    ownership_type: Optional[str] = None
+    crops: Optional[str] = None
+    crop_season: Optional[str] = None
+    irrigation_source: Optional[str] = None
+    soil_type: Optional[str] = None
+    experience_years: Optional[int] = None
+
+class ProfileUpdateFinancial(BaseModel):
+    loan_amount: Optional[float] = None
+    loan_source: Optional[str] = None
+    has_insurance: Optional[bool] = None
+    insurance_scheme: Optional[str] = None
+    income_band: Optional[str] = None
+    past_crop_loss: Optional[bool] = None
+    dependents: Optional[int] = None
+
+class ProfileUpdate(BaseModel):
+    identity: Optional[ProfileUpdateIdentity] = None
+    farm: Optional[ProfileUpdateFarm] = None
+    financial: Optional[ProfileUpdateFinancial] = None
+
+
+# ─────────────────────────────────────────────
 # Government / Officer Dashboard
 # ─────────────────────────────────────────────
 
@@ -214,3 +248,4 @@ class GovernmentDashboardResponse(BaseModel):
     watch_count: int
     stable_count: int
     farmers: List[FarmerOverviewItem]
+
