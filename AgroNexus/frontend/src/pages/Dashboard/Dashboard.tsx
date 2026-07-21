@@ -9,6 +9,8 @@ import {
   ChevronRight, LogOut
 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import AIChatbot from '../../components/AIChatbot/AIChatbot';
+import { useLanguage } from '../../context/LanguageContext';
 import type { DashboardData } from '../../types';
 import { getRiskBandColor, getRiskBandBg } from '../../types';
 
@@ -16,6 +18,7 @@ const API_URL = 'http://localhost:8000/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { t, language } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [recomputing, setRecomputing] = useState(false);
@@ -75,9 +78,15 @@ export default function Dashboard() {
   const bandColor = getRiskBandColor(label);
   const isCritical = label === 'Critical';
 
+  // Translated band label
+  const translatedLabel = label === 'Critical' ? t('band.critical')
+    : label === 'High Risk' ? t('band.highRisk')
+    : label === 'Watch' ? t('band.watch')
+    : t('band.stable');
+
   // Prepare forecast chart data
   const forecastChart = data.forecast_data?.dates?.map((date: string, i: number) => ({
-    date: date.slice(5),  // MM-DD
+    date: date.slice(5),
     rain: data.forecast_data?.precipitation_mm?.[i] ?? 0,
     maxT: data.forecast_data?.temp_max?.[i] ?? 0,
     minT: data.forecast_data?.temp_min?.[i] ?? 0,
@@ -85,7 +94,7 @@ export default function Dashboard() {
 
   // Risk history for trend
   const trendData = [...(data.risk_history || [])].reverse().map(r => ({
-    date: new Date(r.computed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+    date: new Date(r.computed_at).toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short' }),
     financial: r.financial_risk,
     disaster: r.disaster_risk,
     compound: r.compound_risk,
@@ -105,7 +114,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', margin: 0 }}>
-              Namaste, {data.farmer.full_name} 🙏
+              {t('dash.namaste')}, {data.farmer.full_name} 🙏
             </h1>
             <p style={{ color: '#6b7280', margin: '4px 0 0', fontSize: 14 }}>
               PIN: {data.farmer.pin_code} • {data.farmer.latitude?.toFixed(2)}°N, {data.farmer.longitude?.toFixed(2)}°E
@@ -117,14 +126,14 @@ export default function Dashboard() {
               background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <RefreshCw size={14} className={recomputing ? 'animate-spin' : ''} /> Refresh Risk
+              <RefreshCw size={14} className={recomputing ? 'animate-spin' : ''} /> {t('dash.refreshRisk')}
             </button>
             <button onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} style={{
               padding: '10px 18px', borderRadius: 10, border: '1.5px solid #fecaca',
               background: '#fff', cursor: 'pointer', color: '#dc2626', fontWeight: 600,
               fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <LogOut size={14} /> Logout
+              <LogOut size={14} /> {t('nav.logout')}
             </button>
           </div>
         </div>
@@ -141,7 +150,7 @@ export default function Dashboard() {
           >
             <AlertTriangle size={28} />
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>⚠️ POSSIBLE CRISIS WITHIN 15 DAYS</div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>{t('dash.possibleCrisis')}</div>
               <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
                 Your compound vulnerability is {compound}%. Financial fragility and disaster exposure are both elevated. Immediate action recommended.
               </div>
@@ -154,12 +163,12 @@ export default function Dashboard() {
           {/* Compound Risk */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             style={{ ...cardStyle, border: `2px solid ${bandColor}`, background: getRiskBandBg(label) }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Compound Risk</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>{t('dash.compoundRisk')}</div>
             <div style={{ fontSize: 42, fontWeight: 900, color: bandColor, margin: '8px 0 4px' }}>{compound}%</div>
             <div style={{
               display: 'inline-block', padding: '4px 12px', borderRadius: 999,
               background: bandColor, color: '#fff', fontWeight: 700, fontSize: 12,
-            }}>{label}</div>
+            }}>{translatedLabel}</div>
           </motion.div>
 
           {/* Financial Risk */}
@@ -167,7 +176,7 @@ export default function Dashboard() {
             style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <Wallet size={18} style={{ color: '#d97706' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Financial Risk</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>{t('dash.financialRisk')}</span>
             </div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#111827' }}>{risk?.financial_risk ?? '—'}<span style={{ fontSize: 16, color: '#9ca3af' }}>/100</span></div>
           </motion.div>
@@ -177,7 +186,7 @@ export default function Dashboard() {
             style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <CloudRain size={18} style={{ color: '#2563eb' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Disaster Risk</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>{t('dash.disasterRisk')}</span>
             </div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#111827' }}>{risk?.disaster_risk ?? '—'}<span style={{ fontSize: 16, color: '#9ca3af' }}>/100</span></div>
           </motion.div>
@@ -185,10 +194,10 @@ export default function Dashboard() {
           {/* Farm Info */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             style={cardStyle}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', marginBottom: 8 }}>Farm</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', marginBottom: 8 }}>{t('dash.farm')}</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{data.farm_details?.crops || '—'}</div>
             <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-              {data.farm_details?.land_size_acres} acres • {data.farm_details?.ownership_type} • {data.farm_details?.irrigation_source}
+              {data.farm_details?.land_size_acres} {t('dash.acres')} • {data.farm_details?.ownership_type} • {data.farm_details?.irrigation_source}
             </div>
           </motion.div>
         </div>
@@ -290,6 +299,7 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+      <AIChatbot />
     </div>
   );
 }

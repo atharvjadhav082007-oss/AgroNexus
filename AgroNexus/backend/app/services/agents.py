@@ -16,23 +16,36 @@ from ortools.sat.python import cp_model
 
 
 # ─────────────────────────────────────────────
-# Gemini LLM Client (optional — for reasoning text)
+# Gemini LLM Client (dynamic env loading)
 # ─────────────────────────────────────────────
 
-_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-_AI_ENABLED = bool(_GEMINI_API_KEY and _GEMINI_API_KEY.strip() not in ["", "your_gemini_api_key_here"])
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Ensure .env is loaded from backend root directory
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 _gemini_client = None
+_cached_key = None
+
+def _get_gemini_api_key() -> str:
+    # Ensure fresh load from .env
+    load_dotenv(dotenv_path=env_path, override=True)
+    return os.getenv("GEMINI_API_KEY", "").strip()
 
 def _get_gemini_client():
-    global _gemini_client
-    if _gemini_client is not None:
-        return _gemini_client
-    if not _AI_ENABLED:
+    global _gemini_client, _cached_key
+    api_key = _get_gemini_api_key()
+    if not api_key or api_key in ["", "your_gemini_api_key_here"]:
         return None
+    if _gemini_client is not None and _cached_key == api_key:
+        return _gemini_client
     try:
         from google import genai
-        _gemini_client = genai.Client(api_key=_GEMINI_API_KEY)
+        _gemini_client = genai.Client(api_key=api_key)
+        _cached_key = api_key
+        print(f"[KhetSeva] Gemini Client initialized successfully.")
         return _gemini_client
     except Exception as e:
         print(f"[KhetSeva] Gemini init failed: {e}. Using rule-based reasoning.")
@@ -41,19 +54,28 @@ def _get_gemini_client():
 def _call_gemini(prompt: str, fallback: str) -> str:
     client = _get_gemini_client()
     if client is None:
-        return fallback
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-        )
-        return response.text.strip()
-    except Exception as e:
-        print(f"[KhetSeva] Gemini API call failed: {e}. Using fallback.")
+        print("[KhetSeva] No Gemini client available. Returning fallback.")
         return fallback
 
+    # Try different models in case one model tier has hit rate limits
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            print(f"[KhetSeva] Gemini call succeeded using {model_name}.")
+            return response.text.strip()
+        except Exception as e:
+            error_str = str(e)
+            print(f"[KhetSeva] Model '{model_name}' failed: {error_str[:120]}...")
+
+    return "⚠️ **All Gemini API models are currently rate-limited (429).** Please wait 30–60 seconds for the free-tier quota to reset and ask your question again!"
+
 def is_ai_powered() -> bool:
-    return _AI_ENABLED
+    api_key = _get_gemini_api_key()
+    return bool(api_key and api_key not in ["", "your_gemini_api_key_here"])
 
 
 # ─────────────────────────────────────────────
@@ -153,7 +175,7 @@ Income band: {income_band}, Crop: {crop}
 
 Explain the key stress factors and suggest one practical step they can take. Be empathetic and constructive."""
 
-        thought_process = _call_gemini(ai_prompt, fallback)
+        thought_process = fallback
 
         return {
             "risk_score": score,
@@ -201,18 +223,7 @@ class DisasterAgent:
             f"{'⚠️ HIGH RISK — immediate protective action recommended.' if score >= 65 else 'Continue monitoring weather conditions.'}"
         )
 
-        ai_prompt = f"""You are an agricultural disaster risk analyst for Indian farming regions. Analyze this weather assessment and write 3-4 sentences in simple English:
-
-Disaster Risk Score: {score}/100 ({risk_level})
-Primary hazard: {hazard}
-Drought signal: {drought}% (forecast {disaster_signals.get('forecast_total_mm', 0)}mm vs normal {disaster_signals.get('seasonal_normal_mm', 0)}mm)
-Flood signal: {flood}% (rolling 3-day rainfall check)
-Heat stress signal: {heat}% ({disaster_signals.get('max_consecutive_hot_days', 0)} consecutive hot days above {disaster_signals.get('crop_heat_threshold', 36)}°C)
-Crop: {crop}
-
-Explain the specific climate threats and recommend 1-2 immediate protective actions."""
-
-        thought_process = _call_gemini(ai_prompt, fallback)
+        thought_process = fallback
 
         return {
             "risk_score": score,

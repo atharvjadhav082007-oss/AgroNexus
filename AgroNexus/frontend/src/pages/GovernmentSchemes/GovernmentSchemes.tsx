@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Landmark, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:8000/api';
 
 export default function GovernmentSchemes() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [schemes, setSchemes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
@@ -50,10 +52,10 @@ export default function GovernmentSchemes() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
           <Landmark size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-          Government Schemes
+          {t('schemes.title')}
         </h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>
-          Eligibility checked against your profile for {schemes.length} central government schemes
+          {t('schemes.subtitle')}
         </p>
 
         {schemes.length === 0 ? (

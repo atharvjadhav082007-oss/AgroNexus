@@ -7,6 +7,7 @@ from app.routes.farmer import router as farmer_router
 from app.routes.risk import router as risk_router
 from app.routes.recommendations import router as recommendations_router
 from app.routes.government import router as government_router
+from app.routes.chatbot import router as chatbot_router
 from app.errors import KhetSevaError, khetseva_error_handler
 
 # Create all tables
@@ -40,6 +41,7 @@ app.include_router(farmer_router)
 app.include_router(risk_router)
 app.include_router(recommendations_router)
 app.include_router(government_router)
+app.include_router(chatbot_router)
 
 
 @app.get("/")

@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2, DollarSign, TrendingDown } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:8000/api';
 
 export default function FinancialSolutions() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [budget, setBudget] = useState('500000');
@@ -37,10 +39,10 @@ export default function FinancialSolutions() {
       <Navbar />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
-          💹 Financial Solutions — OR-Tools Optimizer
+          {t('fin.title')}
         </h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>
-          Optimal relief fund allocation using constraint programming (CP-SAT)
+          {t('fin.subtitle')}
         </p>
 
         <div style={{ ...card, marginBottom: 24 }}>

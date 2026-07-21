@@ -6,11 +6,13 @@ import {
 } from 'recharts';
 import { CloudRain, Thermometer, Droplets, AlertTriangle, Loader2 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:8000/api';
 
 export default function DisasterScore() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
@@ -77,10 +79,10 @@ export default function DisasterScore() {
       <Navbar />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
-          🌊 Disaster Risk Analysis
+          {t('disaster.title')}
         </h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>
-          16-day forecast-based disaster prediction • {data.is_mock ? '⚠️ Mock data (offline)' : '✅ Live Open-Meteo data'}
+          {t('disaster.subtitle')} • {data.is_mock ? '⚠️ Mock data (offline)' : '✅ Live Open-Meteo data'}
         </p>
 
         {/* Overall Score + Signals */}
@@ -89,22 +91,22 @@ export default function DisasterScore() {
             ...card, borderLeft: `4px solid ${data.risk_score >= 65 ? '#dc2626' : data.risk_score >= 40 ? '#d97706' : '#16a34a'}`,
           }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>
-              Disaster Risk Score
+              {t('disaster.score')}
             </div>
             <div style={{ fontSize: 48, fontWeight: 900, color: '#111827' }}>{data.risk_score}<span style={{ fontSize: 20 }}>/100</span></div>
             <div style={{
               display: 'inline-block', padding: '4px 12px', borderRadius: 999, fontWeight: 700, fontSize: 12,
               background: data.risk_level === 'High' ? '#fef2f2' : data.risk_level === 'Medium' ? '#fffbeb' : '#f0fdf4',
               color: data.risk_level === 'High' ? '#dc2626' : data.risk_level === 'Medium' ? '#d97706' : '#16a34a',
-            }}>{data.risk_level} Risk</div>
-            <div style={{ marginTop: 8, fontSize: 13, color: '#6b7280' }}>Hazard: {data.hazard_type}</div>
+            }}>{t(data.risk_level === 'High' ? 'band.highRisk' : data.risk_level === 'Medium' ? 'band.watch' : 'band.stable')}</div>
+            <div style={{ marginTop: 8, fontSize: 13, color: '#6b7280' }}>{t('disaster.hazard')}: {data.hazard_type}</div>
           </div>
 
           <div style={card}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700 }}>Signal Breakdown</h3>
-            {signalBar('Drought', signals.drought_signal || 0, '#d97706', <Droplets size={16} style={{ color: '#d97706' }} />)}
-            {signalBar('Flood', signals.flood_signal || 0, '#2563eb', <CloudRain size={16} style={{ color: '#2563eb' }} />)}
-            {signalBar('Heat Stress', signals.heat_signal || 0, '#dc2626', <Thermometer size={16} style={{ color: '#dc2626' }} />)}
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 16 }}>{t('disaster.signals')}</h3>
+            {signalBar(t('disaster.flood'), signals.flood_risk || 0, '#3b82f6', <CloudRain size={16} color="#3b82f6" />)}
+            {signalBar(t('disaster.drought'), signals.drought_risk || 0, '#eab308', <AlertTriangle size={16} color="#eab308" />)}
+            {signalBar(t('disaster.heatwave'), signals.heatwave_risk || 0, '#ef4444', <Thermometer size={16} color="#ef4444" />)}
           </div>
         </div>
 

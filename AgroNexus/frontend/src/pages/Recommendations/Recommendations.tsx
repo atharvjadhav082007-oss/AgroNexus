@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ClipboardList, AlertTriangle, Lightbulb, Info, Loader2 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:8000/api';
 
 export default function Recommendations() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
@@ -54,10 +56,10 @@ export default function Recommendations() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
           <ClipboardList size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-          Recommendations
+          {t('rec.title')}
         </h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>
-          Personalized actions based on your risk profile
+          {t('rec.subtitle')}
           {compound && ` • Compound Risk: ${compound.compound_risk}% (${compound.label})`}
         </p>
 
