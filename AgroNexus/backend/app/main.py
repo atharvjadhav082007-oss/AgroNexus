@@ -1,27 +1,55 @@
-# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
-from app.dp.database import engine, Base
-from app.dp import models
+from fastapi.middleware.cors import CORSMiddleware
 
-# This command tells SQLAlchemy to create all tables if they don't exist
+from app.db.database import engine, Base
+from app.routes.auth import router as auth_router
+from app.routes.farmer import router as farmer_router
+from app.routes.risk import router as risk_router
+from app.routes.recommendations import router as recommendations_router
+from app.routes.government import router as government_router
+from app.errors import KhetSevaError, khetseva_error_handler
+
+# Create all tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="KhetSeva API")
+app = FastAPI(
+    title="KhetSeva API",
+    description="Compound Farmer Risk Platform — Financial fragility + Disaster exposure prediction, 15 days ahead.",
+    version="1.0.0",
+)
 
-# Include routers
-from app.routers import farmer as farmer_router
-from app.routers import auth as auth_router
-from app.routers import government as government_router
-from app.routers import allocation as allocation_router
-from app.routers import recommendation as recommendation_router
+# CORS Middleware — locked down to known frontend origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:3000",   # Alt dev port
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
-app.include_router(farmer_router.router, prefix="/farmer", tags=["farmer"])
-app.include_router(government_router.router, prefix="/government", tags=["government"])
-app.include_router(allocation_router.router, prefix="/allocation", tags=["allocation"])
-app.include_router(recommendation_router.router, prefix="/recommendation", tags=["recommendation"])
+# Register global error handler
+app.add_exception_handler(KhetSevaError, khetseva_error_handler)
+
+# Include route modules (all routes have /api prefix built in)
+app.include_router(auth_router)
+app.include_router(farmer_router)
+app.include_router(risk_router)
+app.include_router(recommendations_router)
+app.include_router(government_router)
 
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the KhetSeva Backend!"}
+    return {
+        "name": "KhetSeva",
+        "tagline": "Compound Farmer Risk Platform",
+        "version": "1.0.0",
+        "status": "running",
+        "message": "API accessible at /api/* endpoints",
+    }
+

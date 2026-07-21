@@ -1,0 +1,22 @@
+# Root gitignore for KhetSeva / AgroNexus
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+backend/.env
+backend/*.db
+*.db
+
+# Node / JS
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

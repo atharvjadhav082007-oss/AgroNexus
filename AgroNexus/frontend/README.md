@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# 💻 KhetSeva Frontend — React SPA
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The client application for **KhetSeva**, built with React, Vite, TypeScript, and Tailwind CSS.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🎨 Features & Visual Highlights
 
-## React Compiler
+- **3-Step Signup Wizard**: Sleek multiphase onboarding form with active step indicators and geolocation capture.
+- **Compound Risk Gauge**: Bold color-coded indicators representing risk levels (Stable, Watch, High, Critical) with a specific crisis alert when score exceeds 85.
+- **15-Day Rainfall Chart**: Renders daily forecast rainfall in real time using **Recharts**.
+- **Historical Trends**: Interactive line chart showing the progression of financial, disaster, and compound risk.
+- **Actionable Cards**: Priority-labeled recommendations (Urgent, Recommended, Info) that direct the farmer on exact steps to mitigate risks.
+- **Subsidized Schemes**: Interactive catalog detailing matches to central government schemes like PM-KISAN, PMFBY, and KCC.
+- **Officer Allocation Panel**: Command interface for NGOs/government agencies showing optimal relief allocations solved by the backend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🚀 Setup & Launch
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+```bash
+# Install dependencies
+npm install
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# Run Vite development server
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open `http://localhost:5173` to interact with the application.
