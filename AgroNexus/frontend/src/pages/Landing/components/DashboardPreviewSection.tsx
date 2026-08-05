@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -6,6 +6,105 @@ import { LayoutDashboard, CloudSun, AlertTriangle, Leaf, ShieldCheck, Landmark, 
 
 export default function DashboardPreviewSection() {
   const [activeTab, setActiveTab] = useState<"farmer" | "govt">("farmer");
+  const [stats, setStats] = useState({ total_farmers: 54382, critical_alerts: 842, relief_funds_disbursed: 42000000 });
+  const [scenarioIndex, setScenarioIndex] = useState(0);
+
+  const [scenarios, setScenarios] = useState<any[]>([]);
+  const [optimizations, setOptimizations] = useState<any[]>([]);
+
+  const mockScenarios = [
+    {
+      name: "Ramesh Ji",
+      location: "Farm: Sector 4-B • District: Rohtak, Haryana",
+      riskScore: 24,
+      riskLabel: "Safe (Low Risk)",
+      riskColor: "green",
+      crop: "Soybean",
+      cropCompat: "96%",
+      cropColor: "emerald",
+      weather: "12 mm Rainfall",
+      weatherDesc: "Forecasted for Tomorrow",
+      weatherAlert: "Imminent Rain",
+      weatherColor: "blue",
+      insights: [
+        { text: "Rain tomorrow: Ensure drainage systems in Sector 4 are clear.", color: "amber", icon: "AlertTriangle" },
+        { text: "You qualify for a Crop Insurance Premium Subsidy (₹4,500).", color: "green", icon: "ShieldCheck" }
+      ]
+    },
+    {
+      name: "Hargopal Singh",
+      location: "Farm: Field 12 • District: Bhatinda, Punjab",
+      riskScore: 88,
+      riskLabel: "Critical Risk",
+      riskColor: "rose",
+      crop: "Wheat",
+      cropCompat: "62%",
+      cropColor: "amber",
+      weather: "0 mm Rainfall",
+      weatherDesc: "Forecasted for next 14 days",
+      weatherAlert: "Severe Drought",
+      weatherColor: "rose",
+      insights: [
+        { text: "Critical Drought: Apply for emergency water allocation.", color: "rose", icon: "AlertTriangle" },
+        { text: "Seed Subsidy available for drought-resistant crops.", color: "green", icon: "ShieldCheck" }
+      ]
+    },
+    {
+      name: "Ananth Gowda",
+      location: "Farm: Plot C • District: Mandya, Karnataka",
+      riskScore: 54,
+      riskLabel: "Watch",
+      riskColor: "amber",
+      crop: "Sugarcane",
+      cropCompat: "84%",
+      cropColor: "emerald",
+      weather: "85 mm Rainfall",
+      weatherDesc: "Heavy rain over 3 days",
+      weatherAlert: "Flood Warning",
+      weatherColor: "blue",
+      insights: [
+        { text: "Flood risk elevated: Postpone pesticide application.", color: "amber", icon: "AlertTriangle" }
+      ]
+    }
+  ];
+
+  useEffect(() => {
+    // Fetch live stats
+    fetch("http://localhost:8000/api/stats/landing")
+      .then(res => res.json())
+      .then(data => {
+        if (data.total_farmers !== undefined) {
+          setStats({
+            total_farmers: data.total_farmers,
+            critical_alerts: data.critical_alerts,
+            relief_funds_disbursed: data.relief_funds_disbursed,
+          });
+          
+          if (data.scenarios && data.scenarios.length > 0) {
+            setScenarios(data.scenarios);
+          } else {
+            setScenarios(mockScenarios);
+          }
+
+          if (data.optimizations && data.optimizations.length > 0) {
+            setOptimizations(data.optimizations);
+          }
+        }
+      })
+      .catch(err => {
+        console.error("Failed to fetch stats", err);
+        setScenarios(mockScenarios);
+      });
+
+    // Rotate scenarios
+    const interval = setInterval(() => {
+      setScenarioIndex((prev) => (prev + 1) % scenarios.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayScenarios = scenarios.length > 0 ? scenarios : mockScenarios;
+  const currentScenario = displayScenarios[scenarioIndex % displayScenarios.length];
 
   const chartData = [
     { name: "Mon", rainfall: 5 },
@@ -109,22 +208,22 @@ export default function DashboardPreviewSection() {
                   >
                     {/* Welcome Header */}
                     <div className="sm:col-span-12">
-                      <h3 className="text-lg font-bold text-gray-900">Namaste, Ramesh Ji</h3>
-                      <p className="text-xs text-gray-500">Farm: Sector 4-B • District: Rohtak, Haryana</p>
+                      <h3 className="text-lg font-bold text-gray-900">Namaste, {currentScenario.name.split(" ")[0]} Ji</h3>
+                      <p className="text-xs text-gray-500">{currentScenario.location}</p>
                     </div>
 
                     {/* KPI 1: Risk Card */}
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                       <div className="flex justify-between items-start">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Compound Risk</span>
-                        <ShieldCheck className="w-5 h-5 text-green-700 bg-green-50 p-1 rounded-full" />
+                        <ShieldCheck className={`w-5 h-5 text-${currentScenario.riskColor}-700 bg-${currentScenario.riskColor}-50 p-1 rounded-full`} />
                       </div>
                       <div className="mt-4">
-                        <span className="text-3xl font-extrabold text-gray-900">24</span>
+                        <span className="text-3xl font-extrabold text-gray-900">{currentScenario.riskScore}</span>
                         <span className="text-xs text-gray-400 font-semibold"> / 100</span>
                       </div>
-                      <span className="inline-block mt-3 text-[10px] bg-green-50 text-green-700 font-bold px-2 py-0.5 rounded-md w-fit">
-                        Safe (Low Risk)
+                      <span className={`inline-block mt-3 text-[10px] bg-${currentScenario.riskColor}-50 text-${currentScenario.riskColor}-700 font-bold px-2 py-0.5 rounded-md w-fit`}>
+                        {currentScenario.riskLabel}
                       </span>
                     </div>
 
@@ -132,13 +231,13 @@ export default function DashboardPreviewSection() {
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                       <div className="flex justify-between items-start">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Recommended Crop</span>
-                        <Leaf className="w-5 h-5 text-emerald-700 bg-emerald-50 p-1 rounded-full" />
+                        <Leaf className={`w-5 h-5 text-${currentScenario.cropColor}-700 bg-${currentScenario.cropColor}-50 p-1 rounded-full`} />
                       </div>
                       <div className="mt-4">
-                        <span className="text-xl font-extrabold text-gray-900 block leading-tight">Soybean</span>
-                        <span className="text-[10px] text-green-600 font-bold">96% Soil Compatibility</span>
+                        <span className="text-xl font-extrabold text-gray-900 block leading-tight">{currentScenario.crop}</span>
+                        <span className={`text-[10px] text-${currentScenario.cropColor}-600 font-bold`}>{currentScenario.cropCompat} Soil Compatibility</span>
                       </div>
-                      <span className="inline-block mt-3 text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md w-fit">
+                      <span className={`inline-block mt-3 text-[10px] bg-${currentScenario.cropColor}-50 text-${currentScenario.cropColor}-700 font-bold px-2 py-0.5 rounded-md w-fit`}>
                         Optimal Crop
                       </span>
                     </div>
@@ -147,14 +246,14 @@ export default function DashboardPreviewSection() {
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                       <div className="flex justify-between items-start">
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Weather Alert</span>
-                        <CloudSun className="w-5 h-5 text-blue-600 bg-blue-50 p-1 rounded-full" />
+                        <CloudSun className={`w-5 h-5 text-${currentScenario.weatherColor}-600 bg-${currentScenario.weatherColor}-50 p-1 rounded-full`} />
                       </div>
                       <div className="mt-4">
-                        <span className="text-lg font-extrabold text-gray-900 block leading-tight">12 mm Rainfall</span>
-                        <span className="text-[10px] text-gray-500 block mt-0.5">Forecasted for Tomorrow</span>
+                        <span className="text-lg font-extrabold text-gray-900 block leading-tight">{currentScenario.weather}</span>
+                        <span className="text-[10px] text-gray-500 block mt-0.5">{currentScenario.weatherDesc}</span>
                       </div>
-                      <span className="inline-block mt-3 text-[10px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-md w-fit">
-                        Imminent Rain
+                      <span className={`inline-block mt-3 text-[10px] bg-${currentScenario.weatherColor}-50 text-${currentScenario.weatherColor}-600 font-bold px-2 py-0.5 rounded-md w-fit`}>
+                        {currentScenario.weatherAlert}
                       </span>
                     </div>
 
@@ -184,14 +283,16 @@ export default function DashboardPreviewSection() {
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm space-y-4">
                       <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-wider">AI Advisor Insights</span>
                       <div className="space-y-3 text-xs">
-                        <div className="flex gap-2.5 text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-100">
-                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                          <p className="leading-tight font-medium">Rain tomorrow: Ensure drainage systems in Sector 4 are clear.</p>
-                        </div>
-                        <div className="flex gap-2.5 text-green-800 bg-green-50 p-2.5 rounded-xl border border-green-100">
-                          <ShieldCheck className="w-4 h-4 shrink-0 text-green-700 mt-0.5" />
-                          <p className="leading-tight font-medium">You qualify for a Crop Insurance Premium Subsidy (₹4,500).</p>
-                        </div>
+                        {currentScenario.insights.map((insight, idx) => (
+                          <div key={idx} className={`flex gap-2.5 text-${insight.color}-800 bg-${insight.color}-50 p-2.5 rounded-xl border border-${insight.color}-100`}>
+                            {insight.icon === "AlertTriangle" ? (
+                              <AlertTriangle className={`w-4 h-4 shrink-0 text-${insight.color}-600 mt-0.5`} />
+                            ) : (
+                              <ShieldCheck className={`w-4 h-4 shrink-0 text-${insight.color}-700 mt-0.5`} />
+                            )}
+                            <p className="leading-tight font-medium">{insight.text}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </motion.div>
@@ -217,10 +318,10 @@ export default function DashboardPreviewSection() {
                         <Users className="w-5 h-5 text-[#2E7D32] bg-green-50 p-1 rounded-full" />
                       </div>
                       <div className="mt-4">
-                        <span className="text-3xl font-extrabold text-gray-900">54,382</span>
+                        <span className="text-3xl font-extrabold text-gray-900">{stats.total_farmers.toLocaleString()}</span>
                       </div>
                       <span className="inline-block mt-3 text-[10px] text-green-600 font-bold">
-                        +12% this month
+                        Live Data
                       </span>
                     </div>
 
@@ -231,22 +332,22 @@ export default function DashboardPreviewSection() {
                         <AlertTriangle className="w-5 h-5 text-rose-500 bg-rose-50 p-1 rounded-full" />
                       </div>
                       <div className="mt-4">
-                        <span className="text-3xl font-extrabold text-rose-600 font-display">842</span>
+                        <span className="text-3xl font-extrabold text-rose-600 font-display">{stats.critical_alerts.toLocaleString()}</span>
                         <span className="text-xs text-gray-400 font-semibold"> Farmers</span>
                       </div>
                       <span className="inline-block mt-3 text-[10px] bg-rose-50 text-rose-600 font-bold px-2 py-0.5 rounded-md w-fit">
-                        Drought Imminent
+                        Live Tracking
                       </span>
                     </div>
 
                     {/* KPI 3 */}
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                       <div className="flex justify-between items-start">
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Relief Funds Disbursed</span>
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Relief Funds Needed</span>
                         <Landmark className="w-5 h-5 text-blue-600 bg-blue-50 p-1 rounded-full" />
                       </div>
                       <div className="mt-4">
-                        <span className="text-2xl font-extrabold text-gray-900 font-display">₹4.2 Crore</span>
+                        <span className="text-2xl font-extrabold text-gray-900 font-display">₹{(stats.relief_funds_disbursed / 100000).toFixed(1)} Lakh</span>
                       </div>
                       <span className="inline-block mt-3 text-[10px] text-blue-600 font-bold">
                         Optimized allocation
@@ -278,27 +379,41 @@ export default function DashboardPreviewSection() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-                            <tr>
-                              <td className="py-3">Hargopal Singh</td>
-                              <td>Punjab, Bhatinda</td>
-                              <td className="text-center"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded font-bold">88/100</span></td>
-                              <td>Seed Subsidy & Water Kit</td>
-                              <td className="text-right font-bold">₹15,000</td>
-                            </tr>
-                            <tr>
-                              <td className="py-3">Ramesh Yadav</td>
-                              <td>Haryana, Rohtak</td>
-                              <td className="text-center"><span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded font-bold">64/100</span></td>
-                              <td>Debt Moratorium Relief</td>
-                              <td className="text-right font-bold">₹22,000</td>
-                            </tr>
-                            <tr>
-                              <td className="py-3">Ananth Gowda</td>
-                              <td>Karnataka, Mandya</td>
-                              <td className="text-center"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded font-bold">92/100</span></td>
-                              <td>Emergency Water Intervene</td>
-                              <td className="text-right font-bold">₹25,000</td>
-                            </tr>
+                            {optimizations.length > 0 ? (
+                              optimizations.map((opt: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="py-3">{opt.farmer_name}</td>
+                                  <td>{opt.region}</td>
+                                  <td className="text-center"><span className={`px-2 py-0.5 bg-${opt.bg_class} text-${opt.text_class} rounded font-bold`}>{opt.risk_score_str}</span></td>
+                                  <td>{opt.intervention}</td>
+                                  <td className="text-right font-bold">{opt.allocation}</td>
+                                </tr>
+                              ))
+                            ) : (
+                              <>
+                                <tr>
+                                  <td className="py-3">Hargopal Singh</td>
+                                  <td>Punjab, Bhatinda</td>
+                                  <td className="text-center"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded font-bold">88/100</span></td>
+                                  <td>Seed Subsidy & Water Kit</td>
+                                  <td className="text-right font-bold">₹15,000</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-3">Ramesh Yadav</td>
+                                  <td>Haryana, Rohtak</td>
+                                  <td className="text-center"><span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded font-bold">64/100</span></td>
+                                  <td>Debt Moratorium Relief</td>
+                                  <td className="text-right font-bold">₹22,000</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-3">Ananth Gowda</td>
+                                  <td>Karnataka, Mandya</td>
+                                  <td className="text-center"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded font-bold">92/100</span></td>
+                                  <td>Emergency Water Intervene</td>
+                                  <td className="text-right font-bold">₹25,000</td>
+                                </tr>
+                              </>
+                            )}
                           </tbody>
                         </table>
                       </div>

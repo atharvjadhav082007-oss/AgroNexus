@@ -3,6 +3,7 @@ KhetSeva Weather Service — Open-Meteo Integration
 Free, no API key required, 16-day forecast + historical archive for baselines.
 """
 
+import os
 import requests
 import hashlib
 import random
@@ -81,6 +82,94 @@ def fetch_seasonal_baseline(latitude: float, longitude: float) -> float:
     except Exception as e:
         print(f"[KhetSeva] Open-Meteo archive failed: {e}")
         return 5.0
+
+
+# ─────────────────────────────────────────────
+# OpenWeatherMap 5-Day Forecast (Secondary Fallback)
+# ─────────────────────────────────────────────
+
+def fetch_openweathermap_forecast(latitude: float, longitude: float, baseline: float = 5.0) -> Optional[Dict[str, Any]]:
+    """
+    Fetch 5-day/3-hour forecast from OpenWeatherMap using API key.
+    Aggregates into daily data and pads the remaining 11 days using the seasonal baseline.
+    """
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+    if not api_key:
+        return None
+        
+    try:
+        url = (
+            f"https://api.openweathermap.org/data/2.5/forecast"
+            f"?lat={latitude}&lon={longitude}&appid={api_key}&units=metric"
+        )
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            print(f"[KhetSeva] OpenWeatherMap forecast returned {response.status_code}")
+            return None
+            
+        data = response.json()
+        list_data = data.get("list", [])
+        
+        # Aggregate 3-hourly data into daily
+        daily_agg = {}
+        for item in list_data:
+            dt_txt = item.get("dt_txt", "")
+            date_str = dt_txt.split(" ")[0] if dt_txt else ""
+            if not date_str:
+                continue
+                
+            main = item.get("main", {})
+            rain = item.get("rain", {})
+            temp_max = main.get("temp_max", 0.0)
+            temp_min = main.get("temp_min", 0.0)
+            # rain is returned as a dict e.g. {"3h": 0.5}
+            precip = rain.get("3h", 0.0) if isinstance(rain, dict) else 0.0
+            
+            if date_str not in daily_agg:
+                daily_agg[date_str] = {
+                    "temp_max": temp_max,
+                    "temp_min": temp_min,
+                    "precip_sum": precip
+                }
+            else:
+                daily_agg[date_str]["temp_max"] = max(daily_agg[date_str]["temp_max"], temp_max)
+                daily_agg[date_str]["temp_min"] = min(daily_agg[date_str]["temp_min"], temp_min)
+                daily_agg[date_str]["precip_sum"] += precip
+                
+        sorted_dates = sorted(daily_agg.keys())
+        dates = []
+        precipitation_mm = []
+        temp_max_arr = []
+        temp_min_arr = []
+        
+        for d in sorted_dates:
+            dates.append(d)
+            precipitation_mm.append(round(daily_agg[d]["precip_sum"], 1))
+            temp_max_arr.append(round(daily_agg[d]["temp_max"], 1))
+            temp_min_arr.append(round(daily_agg[d]["temp_min"], 1))
+            
+        # Pad up to 16 days
+        if len(dates) > 0:
+            last_date_obj = datetime.strptime(dates[-1], "%Y-%m-%d")
+            avg_temp_max = sum(temp_max_arr) / len(temp_max_arr) if temp_max_arr else 30.0
+            avg_temp_min = sum(temp_min_arr) / len(temp_min_arr) if temp_min_arr else 20.0
+            
+            while len(dates) < 16:
+                last_date_obj += timedelta(days=1)
+                dates.append(last_date_obj.strftime("%Y-%m-%d"))
+                precipitation_mm.append(round(baseline, 1))
+                temp_max_arr.append(round(avg_temp_max, 1))
+                temp_min_arr.append(round(avg_temp_min, 1))
+                
+        return {
+            "dates": dates[:16],
+            "precipitation_mm": precipitation_mm[:16],
+            "temp_max": temp_max_arr[:16],
+            "temp_min": temp_min_arr[:16],
+        }
+    except Exception as e:
+        print(f"[KhetSeva] OpenWeatherMap forecast failed: {e}")
+        return None
 
 
 # ─────────────────────────────────────────────
@@ -226,23 +315,32 @@ def get_weather_and_disaster(
     """
     Full weather pipeline:
     1. Fetch 16-day forecast from Open-Meteo
-    2. Fetch seasonal baseline from historical archive
-    3. Compute disaster signals (drought / flood / heat)
+    2. Fallback to OpenWeatherMap 5-day padded
+    3. Fetch seasonal baseline from historical archive
+    4. Compute disaster signals (drought / flood / heat)
     Returns forecast data + disaster analysis in one response.
     """
+    # Fetch seasonal baseline first so we can pass it to the OWM fallback if needed
+    baseline = fetch_seasonal_baseline(latitude, longitude)
+
     # Try real API first
     forecast = fetch_16day_forecast(latitude, longitude)
     is_mock = False
+    is_owm = False
 
     if forecast is None:
+        print("[KhetSeva] Open-Meteo failed. Trying OpenWeatherMap fallback...")
+        forecast = fetch_openweathermap_forecast(latitude, longitude, baseline)
+        if forecast:
+            is_owm = True
+
+    if forecast is None:
+        print("[KhetSeva] OpenWeatherMap failed. Using deterministic mock...")
         forecast = generate_mock_forecast(latitude, longitude, pin_code)
         is_mock = True
 
-    # Get seasonal baseline
-    if not is_mock:
-        baseline = fetch_seasonal_baseline(latitude, longitude)
-    else:
-        # For mock data, use a reasonable Indian monsoon baseline
+    # For mock data, use a reasonable Indian monsoon baseline
+    if is_mock:
         baseline = 8.0  # ~8mm/day average during monsoon season
 
     # Compute disaster signals
@@ -253,4 +351,6 @@ def get_weather_and_disaster(
         "disaster": signals,
         "seasonal_baseline_daily_mm": round(baseline, 2),
         "is_mock": is_mock,
+        "is_owm": is_owm,
     }
+

@@ -2,7 +2,9 @@
 KhetSeva Custom Errors — Structured exception classes + global handler.
 """
 
+# pyrefly: ignore [missing-import]
 from fastapi import Request
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
 
 

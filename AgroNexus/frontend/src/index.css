@@ -23,6 +23,167 @@
   }
 }
 
+/* ── Risk Gauge Animation ── */
+@keyframes gauge-fill {
+  from { stroke-dashoffset: 283; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--glow-color, rgba(220,38,38,0.4))); }
+  50% { filter: drop-shadow(0 0 18px var(--glow-color, rgba(220,38,38,0.7))); }
+}
+
+/* ── Shimmer Effect ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Ticker Scroll ── */
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ── Gradient Shift (time-aware banner) ── */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ── Spin (loading) ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Ripple ── */
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.5; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+/* ── Bar grow ── */
+@keyframes bar-grow {
+  from { width: 0%; }
+}
+
+/* ─── Glass Card ─── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1),
+              box-shadow 0.3s cubic-bezier(.4,0,.2,1),
+              border-color 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(46, 125, 50, 0.06);
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+/* ── Glass Card with accent border ── */
+.glass-card-accent {
+  composes: glass-card;
+  border-left: 3px solid;
+}
+
+/* ── Risk Gauge ── */
+.risk-gauge-circle {
+  transition: stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1);
+  animation: gauge-fill 1.5s cubic-bezier(.4,0,.2,1) forwards;
+}
+
+.risk-gauge-critical {
+  animation: glow-pulse 2s ease-in-out infinite;
+  --glow-color: rgba(220, 38, 38, 0.5);
+}
+
+/* ── Stat Counter ── */
+.stat-value {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ── Ticker ── */
+.ticker-track {
+  display: flex;
+  animation: ticker-scroll 20s linear infinite;
+  white-space: nowrap;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Time Banner Gradient ── */
+.time-banner {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* ── Nav Card Ripple ── */
+.nav-card {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.nav-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(46, 125, 50, 0.12);
+}
+
+.nav-card:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+.nav-card .nav-icon {
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+}
+
+.nav-card:hover .nav-icon {
+  transform: scale(1.25) rotate(-5deg);
+}
+
+/* ── Factor Bar ── */
+.factor-bar-fill {
+  animation: bar-grow 0.8s cubic-bezier(.4,0,.2,1) forwards;
+}
+
+/* ── Shimmer loading ── */
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
 html,
 body,
 #root {
