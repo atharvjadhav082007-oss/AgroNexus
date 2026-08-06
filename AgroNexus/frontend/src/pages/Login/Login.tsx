@@ -5,7 +5,7 @@ import { LogIn, Loader2, Phone, Lock } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const extractErrorMessage = (data: any): string => {
   if (!data) return 'An unexpected error occurred';

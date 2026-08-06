@@ -5,7 +5,7 @@ import { Loader2, DollarSign, TrendingDown } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export default function FinancialSolutions() {
   const navigate = useNavigate();

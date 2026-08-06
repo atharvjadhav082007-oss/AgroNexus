@@ -15,7 +15,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import type { DashboardData, RiskFactor, DisasterSignals } from '../../types';
 import { getRiskBandColor } from '../../types';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // ─────────────────────────────────────────────
 // Animated Number Counter

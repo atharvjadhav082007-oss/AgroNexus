@@ -8,7 +8,7 @@ import { CloudRain, Thermometer, Droplets, AlertTriangle, Loader2 } from 'lucide
 import Navbar from '../../components/Navbar/Navbar';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 export default function DisasterScore() {
   const navigate = useNavigate();

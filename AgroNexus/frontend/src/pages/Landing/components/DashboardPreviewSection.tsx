@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { LayoutDashboard, CloudSun, AlertTriangle, Leaf, ShieldCheck, Landmark, Users } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 export default function DashboardPreviewSection() {
   const [activeTab, setActiveTab] = useState<"farmer" | "govt">("farmer");
   const [stats, setStats] = useState({ total_farmers: 54382, critical_alerts: 842, relief_funds_disbursed: 42000000 });
