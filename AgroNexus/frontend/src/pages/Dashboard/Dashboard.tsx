@@ -15,7 +15,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import type { DashboardData, RiskFactor, DisasterSignals } from '../../types';
 import { getRiskBandColor } from '../../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
+import { API_URL } from '../../config';
 
 // ─────────────────────────────────────────────
 // Animated Number Counter

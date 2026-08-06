@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { LayoutDashboard, CloudSun, AlertTriangle, Leaf, ShieldCheck, Landmark, Users } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
+import { API_URL } from "../../../config";
 
 export default function DashboardPreviewSection() {
   const [activeTab, setActiveTab] = useState<"farmer" | "govt">("farmer");

@@ -5,7 +5,7 @@ import { LogIn, Loader2, Phone, Lock } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
+import { API_URL } from '../../config';
 
 const extractErrorMessage = (data: any): string => {
   if (!data) return 'An unexpected error occurred';

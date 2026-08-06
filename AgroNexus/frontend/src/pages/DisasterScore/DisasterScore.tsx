@@ -8,7 +8,7 @@ import { CloudRain, Thermometer, Droplets, AlertTriangle, Loader2 } from 'lucide
 import Navbar from '../../components/Navbar/Navbar';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
+import { API_URL } from '../../config';
 
 export default function DisasterScore() {
   const navigate = useNavigate();
