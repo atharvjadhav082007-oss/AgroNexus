@@ -285,7 +285,7 @@ export default function DashboardPreviewSection() {
                     <div className="sm:col-span-4 bg-white border border-gray-150 p-5 rounded-2xl shadow-sm space-y-4">
                       <span className="block text-[10px] text-gray-500 font-bold uppercase tracking-wider">AI Advisor Insights</span>
                       <div className="space-y-3 text-xs">
-                        {currentScenario.insights.map((insight, idx) => (
+                        {currentScenario.insights.map((insight: any, idx: number) => (
                           <div key={idx} className={`flex gap-2.5 text-${insight.color}-800 bg-${insight.color}-50 p-2.5 rounded-xl border border-${insight.color}-100`}>
                             {insight.icon === "AlertTriangle" ? (
                               <AlertTriangle className={`w-4 h-4 shrink-0 text-${insight.color}-600 mt-0.5`} />

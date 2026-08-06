@@ -111,8 +111,8 @@ export default function OfficerView() {
   };
 
   // Get list of unique crops for filters
-  const cropsList = data?.farmers
-    ? Array.from(new Set(data.farmers.map((f: any) => f.primary_crop).filter(Boolean)))
+  const cropsList: string[] = data?.farmers
+    ? Array.from(new Set(data.farmers.map((f: any) => f.primary_crop as string).filter(Boolean)))
     : [];
 
   // Filtered farmers
