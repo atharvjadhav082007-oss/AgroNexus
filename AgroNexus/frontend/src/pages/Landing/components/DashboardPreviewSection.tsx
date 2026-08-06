@@ -72,7 +72,7 @@ export default function DashboardPreviewSection() {
 
   useEffect(() => {
     // Fetch live stats
-    fetch("http://localhost:8000/api/stats/landing")
+    fetch(`${API_URL}/stats/landing`)
       .then(res => res.json())
       .then(data => {
         if (data.total_farmers !== undefined) {
