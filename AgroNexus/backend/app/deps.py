@@ -2,8 +2,11 @@
 KhetSeva Shared Dependencies — Common FastAPI dependencies used across routes.
 """
 
+# pyrefly: ignore [missing-import]
 from fastapi import Depends, HTTPException, status
+# pyrefly: ignore [missing-import]
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db

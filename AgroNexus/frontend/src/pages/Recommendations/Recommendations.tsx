@@ -5,7 +5,7 @@ import { ClipboardList, AlertTriangle, Lightbulb, Info, Loader2 } from 'lucide-r
 import Navbar from '../../components/Navbar/Navbar';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
 
 export default function Recommendations() {
   const navigate = useNavigate();

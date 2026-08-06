@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Sprout, Wallet, ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://khetseva-backend-ki7y.onrender.com/api';
 
 const extractErrorMessage = (data: any): string => {
   if (!data) return 'An unexpected error occurred';

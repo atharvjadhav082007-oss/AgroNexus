@@ -21,16 +21,24 @@ app = FastAPI(
 )
 
 # CORS Middleware — locked down to known frontend origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+import os
+origins_env = os.getenv("ALLOWED_ORIGINS")
+if origins_env:
+    allowed_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+else:
+    allowed_origins = [
         "http://localhost:5173",   # Vite dev server
         "http://localhost:5174",
         "http://localhost:3000",   # Alt dev port
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
