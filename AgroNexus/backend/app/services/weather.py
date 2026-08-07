@@ -7,6 +7,7 @@ import os
 import requests
 import hashlib
 import random
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
@@ -309,17 +310,28 @@ def compute_disaster_signals(
 # Main Entry Point
 # ─────────────────────────────────────────────
 
+_WEATHER_CACHE = {}
+
 def get_weather_and_disaster(
     latitude: float, longitude: float, pin_code: str, crop: str = "Rice"
 ) -> Dict[str, Any]:
     """
-    Full weather pipeline:
-    1. Fetch 16-day forecast from Open-Meteo
-    2. Fallback to OpenWeatherMap 5-day padded
-    3. Fetch seasonal baseline from historical archive
-    4. Compute disaster signals (drought / flood / heat)
+    Full weather pipeline with 6-hour in-memory cache:
+    1. Check cache first
+    2. Fetch 16-day forecast from Open-Meteo
+    3. Fallback to OpenWeatherMap 5-day padded
+    4. Fetch seasonal baseline from historical archive
+    5. Compute disaster signals (drought / flood / heat)
     Returns forecast data + disaster analysis in one response.
     """
+    cache_key = f"{latitude:.2f}_{longitude:.2f}_{pin_code}_{crop}"
+    now = time.time()
+    
+    if cache_key in _WEATHER_CACHE:
+        cached_data, timestamp = _WEATHER_CACHE[cache_key]
+        if now - timestamp < 21600:  # 6 hours
+            return cached_data
+
     # Fetch seasonal baseline first so we can pass it to the OWM fallback if needed
     baseline = fetch_seasonal_baseline(latitude, longitude)
 
@@ -346,11 +358,14 @@ def get_weather_and_disaster(
     # Compute disaster signals
     signals = compute_disaster_signals(forecast, baseline, crop)
 
-    return {
+    result = {
         "forecast": forecast,
         "disaster": signals,
         "seasonal_baseline_daily_mm": round(baseline, 2),
         "is_mock": is_mock,
         "is_owm": is_owm,
     }
+    
+    _WEATHER_CACHE[cache_key] = (result, now)
+    return result
 

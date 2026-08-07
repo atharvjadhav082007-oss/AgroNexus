@@ -8,14 +8,13 @@ import {
 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import Footer from '../../components/Footer/Footer';
-import { useLanguage } from '../../context/LanguageContext';
 import { API_URL } from '../../config';
 
 export default function FinancialSolutions() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = sessionStorage.getItem('khetseva_dashboard');
+  const [profile, setProfile] = useState<any>(cachedData ? JSON.parse(cachedData) : null);
+  const [loading, setLoading] = useState(!cachedData);
   const [applyModal, setApplyModal] = useState<string | null>(null);
   
   // EMI Calculator State
@@ -37,6 +36,7 @@ export default function FinancialSolutions() {
         });
         if (res.ok) {
           const d = await res.json();
+          sessionStorage.setItem('khetseva_dashboard', JSON.stringify(d));
           setProfile(d);
         }
       } catch (e) {
@@ -49,42 +49,32 @@ export default function FinancialSolutions() {
     fetchProfileAndRisk();
   }, [token]);
 
-  // Calculate dynamic credit score based on risk
-  const getCreditScore = () => {
-    if (!profile) return 600;
-    const compoundRisk = profile.risk_score?.compound_risk || 0;
-    
-    // Base credit score on a 300 - 900 scale
-    let score = Math.round(850 - (compoundRisk * 5));
-    
-    // Adjust for crop loss & active loans
-    if (profile.farmer?.financial_details?.past_crop_loss) {
-      score -= 40;
-    }
-    if ((profile.farmer?.financial_details?.loan_amount || 0) > 100000) {
-      score -= 30;
-    }
-    
-    return Math.max(300, Math.min(900, score));
+  // Extract new risk scores
+  const latestRisk = profile?.latest_risk;
+  const financialRisk = latestRisk?.financial_risk ?? 0;
+  const disasterRisk = latestRisk?.disaster_risk ?? 0;
+  const compoundRisk = latestRisk?.compound_risk ?? 0;
+  const compoundLabel = latestRisk?.compound_label ?? 'Unknown';
+
+  const getScoreColor = (score: number) => {
+    if (score < 25) return '#16a34a';
+    if (score < 50) return '#d97706';
+    if (score < 75) return '#ea580c';
+    return '#dc2626';
   };
 
-  const creditScore = getCreditScore();
-
-  // Get credit rating label and color
-  const getCreditRating = (score: number) => {
-    if (score >= 750) return { label: 'Excellent', color: '#16a34a', bg: '#f0fdf4' };
-    if (score >= 650) return { label: 'Good', color: '#2563eb', bg: '#eff6ff' };
-    if (score >= 550) return { label: 'Fair', color: '#d97706', bg: '#fef3c7' };
-    return { label: 'Needs Attention', color: '#dc2626', bg: '#fef2f2' };
+  const getScoreBg = (score: number) => {
+    if (score < 25) return '#f0fdf4';
+    if (score < 50) return '#fffbeb';
+    if (score < 75) return '#fff7ed';
+    return '#fef2f2';
   };
 
-  const rating = getCreditRating(creditScore);
-
-  // Dynamic Interest Rate based on Credit Score
+  // Dynamic Interest Rate based on Financial Risk (lower risk = better rate)
   const getInterestRate = () => {
-    if (creditScore >= 750) return 4.0; // Prime rate (KCC subsidized)
-    if (creditScore >= 650) return 6.5; 
-    if (creditScore >= 550) return 8.5;
+    if (financialRisk < 25) return 4.0; // Prime rate (KCC subsidized)
+    if (financialRisk < 50) return 6.5; 
+    if (financialRisk < 75) return 8.5;
     return 11.0; // Sub-prime or microfinance rate
   };
 
@@ -167,10 +157,10 @@ export default function FinancialSolutions() {
         {/* Title */}
         <div style={{ marginBottom: 32 }}>
           <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#111827', margin: '0 0 8px' }}>
-            {t('fin.title')}
+            {"Financial Solutions"}
           </h1>
           <p style={{ color: '#6b7280', fontSize: '16px', margin: 0 }}>
-            {t('fin.subtitle')}
+            {"Risk-adjusted loan offers, insurance, and personalized financial advice."}
           </p>
         </div>
 
@@ -198,10 +188,10 @@ export default function FinancialSolutions() {
             {/* Grid 1: Credit Score Dial + Profile Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
               
-              {/* Credit Score Gauge */}
+              {/* Financial Risk Score Gauge */}
               <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 20 }}>
-                  Your Creditworthiness Score
+                  Financial Risk Score
                 </span>
                 
                 {/* SVG Dial Meter */}
@@ -212,32 +202,78 @@ export default function FinancialSolutions() {
                     <path 
                       d="M 20 100 A 80 80 0 0 1 180 100" 
                       fill="none" 
-                      stroke={rating.color} 
+                      stroke={getScoreColor(financialRisk)} 
                       strokeWidth="16" 
                       strokeLinecap="round"
                       strokeDasharray="251"
-                      strokeDashoffset={251 - ((creditScore - 300) / 600) * 251}
+                      strokeDashoffset={251 - (financialRisk / 100) * 251}
                       style={{ transition: 'stroke-dashoffset 1.5s ease-out' }}
                     />
                   </svg>
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <span style={{ fontSize: 36, fontWeight: 900, color: '#111827' }}>{creditScore}</span>
-                    <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>out of 900</span>
+                    <span style={{ fontSize: 36, fontWeight: 900, color: '#111827' }}>{financialRisk.toFixed(1)}</span>
+                    <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>out of 100</span>
                   </div>
                 </div>
 
                 <div style={{ 
-                  background: rating.bg, color: rating.color, padding: '6px 16px', 
+                  background: getScoreBg(financialRisk), color: getScoreColor(financialRisk), padding: '6px 16px', 
                   borderRadius: 999, fontWeight: 700, fontSize: 14, display: 'inline-flex', 
                   alignItems: 'center', gap: 6, marginBottom: 8
                 }}>
                   <ShieldCheck size={16} />
-                  <span>{rating.label} Credit</span>
+                  <span>{financialRisk < 25 ? 'Low' : financialRisk < 50 ? 'Moderate' : financialRisk < 75 ? 'High' : 'Critical'} Risk</span>
                 </div>
                 
                 <p style={{ fontSize: 13, color: '#6b7280', margin: 0, maxWidth: 280, lineHeight: 1.4 }}>
-                  Calculated dynamically from your compound risk rating of <strong>{profile.risk_score?.compound_risk || 0}%</strong>.
+                  Powered by ML Financial Risk Assessment model based on your income, debt, and crop loss history.
                 </p>
+              </div>
+
+              {/* NEW: Risk Scores Panel */}
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: '#111827', margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Wallet size={20} style={{ color: '#d97706' }} />
+                  <span>ML Risk Assessment</span>
+                </h3>
+
+                {/* Financial Risk */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>Financial Risk (ML Model)</span>
+                    <span style={{ fontWeight: 800, fontSize: 18, color: getScoreColor(financialRisk) }}>{financialRisk}<span style={{ fontSize: 12, color: '#9ca3af' }}>/100</span></span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: `linear-gradient(90deg, #fbbf24, ${getScoreColor(financialRisk)})`, width: `${Math.min(financialRisk, 100)}%`, transition: 'width 1s ease' }} />
+                  </div>
+                </div>
+
+                {/* Disaster Risk */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>Disaster Risk (Weather)</span>
+                    <span style={{ fontWeight: 800, fontSize: 18, color: getScoreColor(disasterRisk) }}>{disasterRisk}<span style={{ fontSize: 12, color: '#9ca3af' }}>/100</span></span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: `linear-gradient(90deg, #60a5fa, ${getScoreColor(disasterRisk)})`, width: `${Math.min(disasterRisk, 100)}%`, transition: 'width 1s ease' }} />
+                  </div>
+                </div>
+
+                {/* Compound Risk */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ color: '#6b7280', fontSize: 13, fontWeight: 600 }}>Compound Risk</span>
+                    <span style={{ fontWeight: 800, fontSize: 18, color: getScoreColor(compoundRisk) }}>{compoundRisk}<span style={{ fontSize: 12, color: '#9ca3af' }}>/100</span></span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: `linear-gradient(90deg, ${getScoreColor(compoundRisk)}, #dc2626)`, width: `${Math.min(compoundRisk, 100)}%`, transition: 'width 1s ease' }} />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 12, background: getScoreColor(compoundRisk) + '10', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: getScoreColor(compoundRisk) }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: getScoreColor(compoundRisk) }}>Status: {compoundLabel}</span>
+                </div>
               </div>
 
               {/* Profile Details Panel */}
@@ -250,22 +286,22 @@ export default function FinancialSolutions() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 10 }}>
                     <span style={{ color: '#6b7280', fontSize: 14 }}>Annual Income Band</span>
-                    <span style={{ fontWeight: 700, color: '#1f2937' }}>₹{profile.farmer?.financial_details?.income_band || '1-3L'}</span>
+                    <span style={{ fontWeight: 700, color: '#1f2937' }}>₹{profile?.financial_details?.income_band || '1-3L'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 10 }}>
                     <span style={{ color: '#6b7280', fontSize: 14 }}>Existing Active Debt</span>
-                    <span style={{ fontWeight: 700, color: '#1f2937' }}>₹{(profile.farmer?.financial_details?.loan_amount || 0).toLocaleString()}</span>
+                    <span style={{ fontWeight: 700, color: '#1f2937' }}>₹{(profile?.financial_details?.loan_amount || 0).toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 10 }}>
                     <span style={{ color: '#6b7280', fontSize: 14 }}>Crop Loss (Last 2 seasons)</span>
-                    <span style={{ fontWeight: 700, color: profile.farmer?.financial_details?.past_crop_loss ? '#dc2626' : '#16a34a' }}>
-                      {profile.farmer?.financial_details?.past_crop_loss ? 'Yes' : 'No'}
+                    <span style={{ fontWeight: 700, color: profile?.financial_details?.past_crop_loss ? '#dc2626' : '#16a34a' }}>
+                      {profile?.financial_details?.past_crop_loss ? 'Yes' : 'No'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 4 }}>
                     <span style={{ color: '#6b7280', fontSize: 14 }}>Enrolled in Insurance (PMFBY)</span>
                     <span style={{ fontWeight: 700, color: '#1f2937', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {profile.farmer?.financial_details?.has_insurance ? (
+                      {profile?.financial_details?.has_insurance ? (
                         <><CheckCircle2 size={16} style={{ color: '#16a34a' }} /> Yes</>
                       ) : 'No'}
                     </span>
@@ -279,7 +315,7 @@ export default function FinancialSolutions() {
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Coins size={22} style={{ color: '#166534' }} />
-                <span>Pre-Approved Offers for {profile.farmer?.full_name}</span>
+                <span>Pre-Approved Offers for {profile?.farmer?.full_name}</span>
               </h2>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, marginBottom: 32 }}>

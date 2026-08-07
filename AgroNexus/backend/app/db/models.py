@@ -125,3 +125,37 @@ class RecommendationLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     farmer = relationship("Farmer", back_populates="recommendations")
+
+
+# ─────────────────────────────────────────────
+# Table 7: Farmer Risk Assessment
+# ─────────────────────────────────────────────
+class FarmerRiskAssessment(Base):
+    __tablename__ = "farmer_risk_assessment"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    loan_amount = Column(Float, nullable=False)
+    land_acres = Column(Float, nullable=False)
+    has_insurance = Column(Boolean, nullable=False)
+    has_recent_loss = Column(Boolean, nullable=False)
+    income_bracket = Column(Integer, nullable=False)
+    pincode = Column(String, nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    financial_risk_score = Column(Float, nullable=False)
+    disaster_risk_score = Column(Float, nullable=False)
+    dominant_hazard = Column(String, nullable=True)
+    overall_risk_score = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ─────────────────────────────────────────────
+# Table 8: Pincode Cache
+# ─────────────────────────────────────────────
+class PincodeCache(Base):
+    __tablename__ = "pincode_cache"
+
+    pincode = Column(String, primary_key=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    resolved_at = Column(DateTime, default=datetime.utcnow)

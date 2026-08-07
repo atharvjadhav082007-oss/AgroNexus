@@ -2,17 +2,15 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck, CloudRain, Leaf, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroImage from "../../../assets/hero-bg.jpg";
-import { useLanguage } from "../../../context/LanguageContext";
 
-const featureTags = (t: (key: string) => string) => [
-  { label: t('hero.tag1'), icon: ShieldCheck },
-  { label: t('hero.tag2'), icon: Leaf },
-  { label: t('hero.tag3'), icon: CloudRain },
-  { label: t('hero.tag4'), icon: Zap },
+const featureTags = [
+  { label: 'Risk Prediction', icon: ShieldCheck },
+  { label: 'Crop Recommendation', icon: Leaf },
+  { label: 'Weather Alerts', icon: CloudRain },
+  { label: 'Govt. Schemes', icon: Zap },
 ];
 
 export default function Hero() {
-  const { t } = useLanguage();
   return (
     <section id="home" className="relative overflow-hidden bg-white">
       <div className="absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[#E8F4EB] blur-3xl opacity-80 -z-10" />
@@ -31,7 +29,7 @@ export default function Hero() {
               className="inline-flex items-center gap-3 rounded-full border border-[#D8F6DB] bg-[#F0FBF1] px-4 py-2 text-sm font-semibold text-[#2E7D32] shadow-sm shadow-green-100/50"
             >
               <span className="text-lg">🌾</span>
-              {t('hero.badge')}
+              AI-Powered Farming Solutions
             </motion.div>
 
             <motion.div
@@ -41,14 +39,14 @@ export default function Hero() {
               className="space-y-6 max-w-3xl"
             >
               <h1 className="text-5xl sm:text-6xl md:text-[64px] font-extrabold tracking-tight text-slate-950 leading-tight">
-                {t('hero.title1')}
+                Smart Decisions.
                 <br />
                 <span className="bg-gradient-to-r from-[#2E7D32] to-[#75B964] bg-clip-text text-transparent">
-                  {t('hero.title2')}
+                  Stronger Harvests.
                 </span>
               </h1>
               <p className="text-lg md:text-xl leading-8 text-slate-600">
-                {t('hero.desc')}
+                KhetSeva uses AI and real-time data to predict risks, recommend the best crops, and support farmers at every step.
               </p>
             </motion.div>
 
@@ -62,14 +60,14 @@ export default function Hero() {
                 to="/dashboard"
                 className="inline-flex items-center justify-center gap-3 rounded-[20px] bg-[#2E7D32] px-8 py-4 text-base font-semibold text-white shadow-xl shadow-green-200/40 transition duration-300 hover:bg-[#25672e] hover:-translate-y-0.5"
               >
-                <span>{t('hero.openDash')}</span>
+                <span>Open Dashboard</span>
                 <ArrowRight className="h-5 w-5" />
               </Link>
               <Link
                 to="/register"
                 className="inline-flex items-center justify-center gap-3 rounded-[20px] border border-[#2E7D32] bg-white px-8 py-4 text-base font-semibold text-[#2E7D32] transition duration-300 hover:bg-[#ecf7ed] hover:-translate-y-0.5"
               >
-                <span>{t('hero.startFree')}</span>
+                <span>Start Free Today</span>
               </Link>
             </motion.div>
 
@@ -79,7 +77,7 @@ export default function Hero() {
               transition={{ duration: 0.55, delay: 0.3 }}
               className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             >
-              {featureTags(t).map((tag) => {
+              {featureTags.map((tag) => {
                 const Icon = tag.icon;
                 return (
                   <div key={tag.label} className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-1 hover:shadow-md">

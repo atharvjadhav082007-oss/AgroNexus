@@ -1,12 +1,9 @@
 import Navbar from "../../components/Navbar/Navbar";
 import Hero from "./components/Hero";
-import TrustSection from "./components/TrustSection";
 import FeaturesSection from "./components/FeaturesSection";
-import StatsSection from "./components/StatsSection";
 import HowItWorksSection from "./components/HowItWorksSection";
 import DashboardPreviewSection from "./components/DashboardPreviewSection";
 import WhyKhetSevaSection from "./components/WhyKhetSevaSection";
-import TestimonialsSection from "./components/TestimonialsSection";
 import CTASection from "./components/CTASection";
 import Footer from "../../components/Footer/Footer";
 
@@ -20,8 +17,6 @@ export default function Landing() {
           <Hero />
         </div>
 
-        <TrustSection />
-
         <div id="features">
           <FeaturesSection />
         </div>
@@ -32,12 +27,6 @@ export default function Landing() {
 
         <WhyKhetSevaSection />
 
-        <StatsSection />
-
-        <div id="about">
-          <TestimonialsSection />
-        </div>
-
         <CTASection />
       </main>
 
@@ -45,3 +34,4 @@ export default function Landing() {
     </div>
   );
 }
+

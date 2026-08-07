@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Loader2, Bot, User, Sparkles } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext';
-
 import { API_URL } from '../../config';
 
 interface Message {
@@ -14,7 +12,6 @@ interface Message {
 }
 
 export default function AIChatbot() {
-  const { t, language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -26,10 +23,10 @@ export default function AIChatbot() {
   const token = localStorage.getItem('token');
 
   const SUGGESTED_QUESTIONS = [
-    t('chat.q1'),
-    t('chat.q2'),
-    t('chat.q3'),
-    t('chat.q4'),
+    '🌾 What crops should I grow?',
+    '📋 Am I eligible for PM-KISAN?',
+    '⚠️ Explain my risk score',
+    '💰 How to reduce loan burden?',
   ];
 
   // Auto-scroll to bottom
@@ -52,7 +49,7 @@ export default function AIChatbot() {
         {
           id: 'greeting',
           role: 'assistant',
-          content: t('chat.greeting'),
+          content: "Namaste! 🙏 I'm **KhetSeva AI Assistant** — your personal farming advisor.\n\nAsk me anything about crops, schemes, weather, or your risk scores!",
           timestamp: new Date(),
           aiPowered: false,
         },
@@ -61,7 +58,7 @@ export default function AIChatbot() {
        // if language changes and we already greeted, we might want to keep the history or just update the greeting?
        // To avoid erasing history, we won't overwrite all messages.
     }
-  }, [isOpen, hasGreeted, language]);
+  }, [isOpen, hasGreeted]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -92,7 +89,7 @@ export default function AIChatbot() {
         body: JSON.stringify({
           message: text.trim(),
           conversation_history: history,
-          language: language,
+          language: 'en',
         }),
       });
 
@@ -267,7 +264,7 @@ export default function AIChatbot() {
                 <Bot size={22} color="#fff" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{t('chat.title')}</div>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{"KhetSeva AI"}</div>
                 <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span
                     style={{
@@ -278,7 +275,7 @@ export default function AIChatbot() {
                       display: 'inline-block',
                     }}
                   />
-                  {t('chat.subtitle')}
+                  {"कृषि सहाय्यक • Online"}
                 </div>
               </div>
               <button
@@ -372,7 +369,7 @@ export default function AIChatbot() {
                           gap: 3,
                         }}
                       >
-                        <Sparkles size={10} /> {t('chat.poweredBy')}
+                        <Sparkles size={10} /> {"Powered by Gemini AI"}
                       </div>
                     )}
                   </div>
@@ -502,7 +499,7 @@ export default function AIChatbot() {
                     sendMessage(input);
                   }
                 }}
-                placeholder={t('chat.placeholder')}
+                placeholder={"Ask about crops, schemes, weather, or math..."}
                 disabled={loading}
                 style={{
                   flex: 1,

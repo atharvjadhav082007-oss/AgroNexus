@@ -3,27 +3,38 @@ import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { User, MapPin, Sprout, Wallet, TrendingUp, Loader2 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
+import PinLocation from '../../components/PinLocation';
 
 import { API_URL } from '../../config';
 
 export default function FarmerProfile() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedData = sessionStorage.getItem('khetseva_dashboard');
+  let parsedCache = null;
+  if (cachedData) {
+    try { parsedCache = JSON.parse(cachedData); } catch (e) { console.error('Cache parse error', e); }
+  }
+  
+  const [profile, setProfile] = useState<any>(parsedCache);
+  const [history, setHistory] = useState<any[]>(parsedCache?.risk_history || []);
+  const [loading, setLoading] = useState(!parsedCache);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
-    Promise.all([
-      fetch(`${API_URL}/farmer/profile`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API_URL}/risk/history`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ]).then(([p, h]) => {
-      setProfile(p);
-      setHistory(h);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    fetch(`${API_URL}/farmer/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        if (r.status === 401) { localStorage.removeItem('token'); sessionStorage.clear(); navigate('/login'); return null; }
+        return r.json();
+      })
+      .then(d => {
+        if (!d) return;
+        setProfile(d);
+        setHistory(d.risk_history || []);
+        sessionStorage.setItem('khetseva_dashboard', JSON.stringify(d));
+        setLoading(false);
+      }).catch(() => setLoading(false));
+  }, [token, navigate]);
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8faf8' }}>
@@ -67,7 +78,7 @@ export default function FarmerProfile() {
           </h3>
           <div style={row}><span style={{ color: '#6b7280' }}>Name</span><span style={{ fontWeight: 600 }}>{farmer?.full_name}</span></div>
           <div style={row}><span style={{ color: '#6b7280' }}>Phone</span><span style={{ fontWeight: 600 }}>{farmer?.phone_number}</span></div>
-          <div style={row}><span style={{ color: '#6b7280' }}>PIN Code</span><span style={{ fontWeight: 600 }}>{farmer?.pin_code}</span></div>
+          <div style={row}><span style={{ color: '#6b7280' }}>PIN Code</span><span style={{ fontWeight: 600 }}><PinLocation pin={farmer?.pin_code} /></span></div>
           <div style={row}><span style={{ color: '#6b7280' }}>Coordinates</span><span style={{ fontWeight: 600 }}>{farmer?.latitude?.toFixed(4)}°N, {farmer?.longitude?.toFixed(4)}°E</span></div>
         </div>
 

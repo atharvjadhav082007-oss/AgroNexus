@@ -249,3 +249,39 @@ class GovernmentDashboardResponse(BaseModel):
     stable_count: int
     farmers: List[FarmerOverviewItem]
 
+
+# ─────────────────────────────────────────────
+# New Farmer Risk Feature Schemas
+# ─────────────────────────────────────────────
+
+class FarmerRiskInput(BaseModel):
+    loan_amount: float = Field(..., ge=0)
+    land_acres: float = Field(..., gt=0)
+    has_insurance: bool
+    has_recent_loss: bool
+    income_bracket: int = Field(..., ge=0, le=3)
+
+class FinancialRiskOutput(BaseModel):
+    financial_risk_score: float
+    risk_band: str
+
+class DisasterBreakdown(BaseModel):
+    flood: float
+    drought: float
+    storm: float
+    frost_or_heat: float
+
+class DisasterRiskOutput(BaseModel):
+    disaster_risk_score: float
+    dominant_hazard: str
+    breakdown: DisasterBreakdown
+    resolved_location: Optional[dict] = None
+
+class CombinedRiskInput(FarmerRiskInput):
+    pincode: str = Field(..., min_length=6, max_length=6)
+
+class CombinedRiskOutput(BaseModel):
+    overall_risk_score: float
+    risk_band: str
+    financial_risk_score: float
+    disaster_risk: DisasterRiskOutput

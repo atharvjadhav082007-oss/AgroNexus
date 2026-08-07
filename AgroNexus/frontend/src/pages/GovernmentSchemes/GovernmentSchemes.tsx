@@ -3,15 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Landmark, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
-import { useLanguage } from '../../context/LanguageContext';
-
 import { API_URL } from '../../config';
 
 export default function GovernmentSchemes() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const [schemes, setSchemes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cachedData = sessionStorage.getItem('khetseva_dashboard');
+  const cachedJson = cachedData ? JSON.parse(cachedData) : null;
+  const [schemes, setSchemes] = useState<any[]>(cachedJson?.eligible_schemes || []);
+  const [loading, setLoading] = useState(!cachedJson);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -19,6 +18,7 @@ export default function GovernmentSchemes() {
     fetch(`${API_URL}/farmer/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => {
+        if (d) sessionStorage.setItem('khetseva_dashboard', JSON.stringify(d));
         setSchemes(d.eligible_schemes || []);
         setLoading(false);
       })
@@ -52,10 +52,10 @@ export default function GovernmentSchemes() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 20px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
           <Landmark size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-          {t('schemes.title')}
+          {"Government Schemes"}
         </h1>
         <p style={{ color: '#6b7280', marginBottom: 24, fontSize: 14 }}>
-          {t('schemes.subtitle')}
+          {"Based on your profile, here are the schemes you can apply for."}
         </p>
 
         {schemes.length === 0 ? (

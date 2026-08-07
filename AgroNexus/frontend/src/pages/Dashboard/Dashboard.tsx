@@ -7,11 +7,11 @@ import {
 import {
   AlertTriangle, Shield, TrendingUp, CloudRain, Wallet, RefreshCw, Loader2,
   ChevronRight, LogOut, ChevronDown, Droplets, Thermometer, Sun, Moon, Sunset,
-  Zap, User, CloudLightning, Sprout
+  Zap, User, CloudLightning, Sprout, Sparkles, ShieldCheck
 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import AIChatbot from '../../components/AIChatbot/AIChatbot';
-import { useLanguage } from '../../context/LanguageContext';
+import PinLocation from '../../components/PinLocation';
 import type { DashboardData, RiskFactor, DisasterSignals } from '../../types';
 import { getRiskBandColor } from '../../types';
 
@@ -21,20 +21,31 @@ import { API_URL } from '../../config';
 // Animated Number Counter
 // ─────────────────────────────────────────────
 function AnimatedCounter({ value, duration = 1.2, suffix = '' }: { value: number; duration?: number; suffix?: string }) {
-  const motionVal = useMotionValue(0);
-  const rounded = useTransform(motionVal, (v) => Math.round(v));
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
-    const controls = animate(motionVal, value, {
-      duration,
-      ease: [0.25, 0.46, 0.45, 0.94],
-    });
-    const unsub = rounded.on('change', (v) => setDisplay(v));
-    return () => { controls.stop(); unsub(); };
-  }, [value, duration, motionVal, rounded]);
+    let startTime: number;
+    let animationFrame: number;
+    
+    const step = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+      
+      // easeOutQuart
+      const ease = 1 - Math.pow(1 - progress, 4);
+      setDisplay(value * ease);
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(step);
+      }
+    };
+    
+    animationFrame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [value, duration]);
 
-  return <span className="stat-value">{display}{suffix}</span>;
+  const formatted = (Math.round(display * 10) / 10).toFixed(1);
+  return <span className="notranslate" style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{formatted}{suffix}</span>;
 }
 
 // ─────────────────────────────────────────────
@@ -80,7 +91,7 @@ function RiskGauge({ value, label, color }: { value: number; label: string; colo
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ fontSize: 36, fontWeight: 900, color, lineHeight: 1 }}>
+        <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1, fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
           <AnimatedCounter value={value} suffix="%" />
         </div>
         <div style={{
@@ -235,9 +246,9 @@ function GlassTooltip({ active, payload, label }: any) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { t, language } = useLanguage();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = sessionStorage.getItem('khetseva_dashboard');
+  const [data, setData] = useState<DashboardData | null>(cachedData ? JSON.parse(cachedData) : null);
+  const [loading, setLoading] = useState(!cachedData);
   const [recomputing, setRecomputing] = useState(false);
   const [error, setError] = useState('');
 
@@ -249,9 +260,10 @@ export default function Dashboard() {
       const res = await fetch(`${API_URL}/farmer/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401) { localStorage.removeItem('token'); navigate('/login'); return; }
+      if (res.status === 401) { localStorage.removeItem('token'); sessionStorage.clear(); navigate('/login'); return; }
       const d = await res.json();
       if (!res.ok) throw new Error(d.detail || 'Failed to load');
+      sessionStorage.setItem('khetseva_dashboard', JSON.stringify(d));
       setData(d);
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -307,14 +319,14 @@ export default function Dashboard() {
   const greeting = getTimeGreeting();
 
   // Translated band label
-  const translatedLabel = label === 'Critical' ? t('band.critical')
-    : label === 'High Risk' ? t('band.highRisk')
-    : label === 'Watch' ? t('band.watch')
-    : t('band.stable');
+  const translatedLabel = label === 'Critical' ? "Critical"
+    : label === 'High Risk' ? "High Risk"
+    : label === 'Watch' ? "Watch"
+    : "Stable";
 
   // Parse risk factors
   let financialFactors: RiskFactor[] = [];
-  let disasterSignals: DisasterSignals | null = null;
+  let disasterSignals: any = null; // using any to accommodate new JSON structure
   try {
     if (risk?.financial_factors_json) financialFactors = JSON.parse(risk.financial_factors_json);
   } catch {}
@@ -332,7 +344,7 @@ export default function Dashboard() {
 
   // Risk history for trend
   const trendData = [...(data.risk_history || [])].reverse().map(r => ({
-    date: new Date(r.computed_at).toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short' }),
+    date: new Date(r.computed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
     financial: r.financial_risk,
     disaster: r.disaster_risk,
     compound: r.compound_risk,
@@ -344,27 +356,27 @@ export default function Dashboard() {
   // Nav items with mini-stats
   const navItems = [
     {
-      label: 'Farmer Profile', path: '/farmer-profile', icon: '👤',
+      label: 'Farmer Profile', path: '/farmer-profile', icon: <User />,
       stat: data.farm_details?.crops || '—', statLabel: 'Crops',
       gradient: 'linear-gradient(135deg, #e0f2fe, #bae6fd)',
     },
     {
-      label: 'Disaster Score', path: '/disaster-score', icon: '🌊',
+      label: 'Disaster Score', path: '/disaster-score', icon: <CloudRain />,
       stat: `${risk?.disaster_risk ?? '—'}`, statLabel: 'Score',
       gradient: 'linear-gradient(135deg, #dbeafe, #bfdbfe)',
     },
     {
-      label: 'Recommendations', path: '/recommendations', icon: '📋',
+      label: 'Recommendations', path: '/recommendations', icon: <Sparkles />,
       stat: `${urgentRecs.length} urgent`, statLabel: 'Actions',
       gradient: urgentRecs.length > 0 ? 'linear-gradient(135deg, #fef2f2, #fecaca)' : 'linear-gradient(135deg, #f0fdf4, #bbf7d0)',
     },
     {
-      label: 'Govt Schemes', path: '/government-schemes', icon: '🏛️',
+      label: 'Govt Schemes', path: '/government-schemes', icon: <ShieldCheck />,
       stat: `${data.eligible_schemes?.filter(s => s.status === 'Eligible now').length || 0}`, statLabel: 'Eligible',
       gradient: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)',
     },
     {
-      label: 'Financial Solutions', path: '/financial-solutions', icon: '💹',
+      label: 'Financial Solutions', path: '/financial-solutions', icon: <Wallet />,
       stat: `₹${(data.financial_details?.loan_amount || 0).toLocaleString()}`, statLabel: 'Loan',
       gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
     },
@@ -373,11 +385,11 @@ export default function Dashboard() {
   // Stagger animation variants
   const stagger = {
     hidden: {},
-    show: { transition: { staggerChildren: 0.08 } },
+    show: { transition: { staggerChildren: 0.04 } },
   };
   const fadeUp = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } },
   };
 
   return (
@@ -406,7 +418,7 @@ export default function Dashboard() {
                 {greeting.text}, {data.farmer.full_name} 🙏
               </h1>
               <p style={{ color: '#4b5563', margin: '4px 0 0', fontSize: 13 }}>
-                PIN: {data.farmer.pin_code} • {data.farmer.latitude?.toFixed(2)}°N, {data.farmer.longitude?.toFixed(2)}°E
+                PIN: <PinLocation pin={data.farmer.pin_code} /> • {data.farmer.latitude?.toFixed(2)}°N, {data.farmer.longitude?.toFixed(2)}°E
                 {risk?.computed_at && (
                   <> • Updated <RelativeTime dateStr={risk.computed_at} /></>
                 )}
@@ -420,15 +432,15 @@ export default function Dashboard() {
               fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
               fontFamily: 'inherit', transition: 'all 0.2s',
             }}>
-              <RefreshCw size={14} style={recomputing ? { animation: 'spin 1s linear infinite' } : {}} /> {t('dash.refreshRisk')}
+              <RefreshCw size={14} style={recomputing ? { animation: 'spin 1s linear infinite' } : {}} /> {"Refresh Risk"}
             </button>
-            <button onClick={() => { localStorage.removeItem('token'); navigate('/login'); }} style={{
+            <button onClick={() => { localStorage.removeItem('token'); sessionStorage.clear(); navigate('/login'); }} style={{
               padding: '10px 18px', borderRadius: 12, border: '1.5px solid rgba(220,38,38,0.2)',
               background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', cursor: 'pointer',
               color: '#dc2626', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
               fontFamily: 'inherit', transition: 'all 0.2s',
             }}>
-              <LogOut size={14} /> {t('nav.logout')}
+              <LogOut size={14} /> {"Logout"}
             </button>
           </div>
         </motion.div>
@@ -454,7 +466,7 @@ export default function Dashboard() {
                 <AlertTriangle size={28} />
               </motion.div>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>{t('dash.possibleCrisis')}</div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>{"POSSIBLE CRISIS WITHIN 15 DAYS"}</div>
                 <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
                   Your compound vulnerability is {compound}%. Financial fragility and disaster exposure are both elevated. Immediate action recommended.
                 </div>
@@ -497,7 +509,7 @@ export default function Dashboard() {
             gridRow: 'span 1',
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1.5, textAlign: 'center', marginBottom: 8 }}>
-              {t('dash.compoundRisk')}
+              {"Compound Risk"}
             </div>
             <RiskGauge value={compound} label={translatedLabel} color={bandColor} />
           </div>
@@ -513,10 +525,10 @@ export default function Dashboard() {
                 <Wallet size={18} style={{ color: '#d97706' }} />
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-                {t('dash.financialRisk')}
+                {"Financial Risk"}
               </span>
             </div>
-            <div style={{ fontSize: 38, fontWeight: 900, color: '#111827', lineHeight: 1 }}>
+            <div style={{ fontSize: 38, fontWeight: 800, color: '#111827', lineHeight: 1, fontFamily: 'var(--font-sans)' }}>
               <AnimatedCounter value={risk?.financial_risk ?? 0} />
               <span style={{ fontSize: 16, color: '#9ca3af', fontWeight: 600 }}>/100</span>
             </div>
@@ -543,10 +555,10 @@ export default function Dashboard() {
                 <CloudRain size={18} style={{ color: '#2563eb' }} />
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-                {t('dash.disasterRisk')}
+                {"Disaster Risk"}
               </span>
             </div>
-            <div style={{ fontSize: 38, fontWeight: 900, color: '#111827', lineHeight: 1 }}>
+            <div style={{ fontSize: 38, fontWeight: 800, color: '#111827', lineHeight: 1, fontFamily: 'var(--font-sans)' }}>
               <AnimatedCounter value={risk?.disaster_risk ?? 0} />
               <span style={{ fontSize: 16, color: '#9ca3af', fontWeight: 600 }}>/100</span>
             </div>
@@ -573,12 +585,12 @@ export default function Dashboard() {
                 <Sprout size={18} style={{ color: '#166534' }} />
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
-                {t('dash.farm')}
+                {"Farm"}
               </span>
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{data.farm_details?.crops || '—'}</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.6 }}>
-              {data.farm_details?.land_size_acres} {t('dash.acres')} • {data.farm_details?.ownership_type}
+              {data.farm_details?.land_size_acres} {"acres"} • {data.farm_details?.ownership_type}
               <br />{data.farm_details?.irrigation_source}
             </div>
           </div>
@@ -612,14 +624,13 @@ export default function Dashboard() {
             )}
             {disasterSignals && (
               <FactorBreakdown
-                title="Disaster Signals"
+                title="Weather Hazard Breakdown"
                 icon={<CloudLightning size={18} style={{ color: '#2563eb' }} />}
                 factors={[
-                  { factor: 'Drought Signal', points: Math.round(disasterSignals.drought_signal * 100) / 100 },
-                  { factor: 'Flood Signal', points: Math.round(disasterSignals.flood_signal * 100) / 100 },
-                  { factor: 'Heat Signal', points: Math.round(disasterSignals.heat_signal * 100) / 100 },
-                  { factor: `Rainfall Ratio (${disasterSignals.rainfall_ratio}x)`, points: Math.round(disasterSignals.forecast_total_mm) },
-                  { factor: `Hot Days (${disasterSignals.max_consecutive_hot_days}d)`, points: disasterSignals.max_consecutive_hot_days },
+                  { factor: 'Flood Risk', points: Number((disasterSignals.flood ?? 0).toFixed(1)) },
+                  { factor: 'Drought Risk', points: Number((disasterSignals.drought ?? 0).toFixed(1)) },
+                  { factor: 'Storm Risk', points: Number((disasterSignals.storm ?? 0).toFixed(1)) },
+                  { factor: 'Frost/Heat Risk', points: Number((disasterSignals.frost_or_heat ?? 0).toFixed(1)) },
                 ]}
                 color="#2563eb"
               />
@@ -694,7 +705,7 @@ export default function Dashboard() {
         {data.recommendations.length > 0 && (
           <motion.div variants={fadeUp} className="glass-card" style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827' }}>📋 Top Recommendations</h3>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827' }}>Top Recommendations</h3>
               <button onClick={() => navigate('/recommendations')} style={{
                 background: 'none', border: 'none', color: '#166534', cursor: 'pointer',
                 fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
@@ -742,7 +753,7 @@ export default function Dashboard() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span className="nav-icon" style={{ fontSize: 28, display: 'block' }}>{item.icon}</span>
+                <span className="nav-icon" style={{ display: 'block', color: '#166534' }}>{item.icon}</span>
                 <ChevronRight size={16} style={{ color: '#9ca3af' }} />
               </div>
               <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{item.label}</div>

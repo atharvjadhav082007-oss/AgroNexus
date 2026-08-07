@@ -1,141 +1,124 @@
-"""
-KhetSeva Risk Routes — per-farmer risk endpoints.
-"""
-
-import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db import models
-from app.deps import get_current_farmer
-from app.services.weather import get_weather_and_disaster
-from app.services.agents import FinancialAgent, DisasterAgent, compute_compound_risk
-from app import schemas
-from app.errors import OnboardingIncompleteError
+from app.db.models import FarmerRiskAssessment
+from app.schemas import (
+    FarmerRiskInput, 
+    FinancialRiskOutput, 
+    DisasterRiskOutput, 
+    CombinedRiskInput, 
+    CombinedRiskOutput
+)
+
+from app.services.financial_risk import financial_risk_service
+from app.services.disaster_risk import disaster_risk_service
+from app.services.geocode import geocode_service
 
 router = APIRouter(prefix="/api/risk", tags=["Risk"])
 
-
-@router.get("/financial")
-def get_financial_risk(
-    current_user: models.Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db),
-):
-    """Return financial risk scorecard breakdown for the logged-in farmer."""
-    farm = db.query(models.FarmDetails).filter(
-        models.FarmDetails.farmer_id == current_user.id
-    ).first()
-    fin = db.query(models.FinancialDetails).filter(
-        models.FinancialDetails.farmer_id == current_user.id
-    ).first()
-
-    if not farm or not fin:
-        raise OnboardingIncompleteError("onboarding")
-
-    crop = farm.crops.split(",")[0].strip() if farm.crops else "Rice"
-
-    agent = FinancialAgent()
-    result = agent.run(
-        has_insurance=fin.has_insurance,
-        loan_source=fin.loan_source,
-        land_size_acres=farm.land_size_acres,
-        ownership_type=farm.ownership_type,
-        past_crop_loss=fin.past_crop_loss,
-        dependents=fin.dependents,
-        income_band=fin.income_band,
-        crop=crop,
+@router.post("/financial", response_model=FinancialRiskOutput)
+def calculate_financial_risk(input_data: FarmerRiskInput):
+    """Calculate the financial risk score based on farmer inputs."""
+    result = financial_risk_service.calculate_risk(
+        loan_amount=input_data.loan_amount,
+        land_acres=input_data.land_acres,
+        has_insurance=input_data.has_insurance,
+        has_recent_loss=input_data.has_recent_loss,
+        income_bracket=input_data.income_bracket
     )
-
     return result
 
-
-@router.get("/disaster")
-def get_disaster_risk(
-    current_user: models.Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db),
+@router.get("/disaster", response_model=DisasterRiskOutput)
+def calculate_disaster_risk(
+    pincode: str = Query(None, min_length=6, max_length=6),
+    latitude: float = Query(None),
+    longitude: float = Query(None),
+    db: Session = Depends(get_db)
 ):
-    """Return disaster risk analysis with 16-day forecast for the logged-in farmer."""
-    farm = db.query(models.FarmDetails).filter(
-        models.FarmDetails.farmer_id == current_user.id
-    ).first()
+    """Calculate the weather-based disaster risk score using coordinates or pincode."""
+    if not (pincode or (latitude and longitude)):
+        raise HTTPException(status_code=422, detail="Must provide either pincode or latitude/longitude.")
 
-    crop = farm.crops.split(",")[0].strip() if farm and farm.crops else "Rice"
-
-    lat = current_user.latitude or 28.61
-    lon = current_user.longitude or 77.20
-
-    weather_data = get_weather_and_disaster(lat, lon, current_user.pin_code, crop)
-
-    agent = DisasterAgent()
-    result = agent.run(weather_data["disaster"], crop)
-
-    return {
-        **result,
-        "forecast": weather_data["forecast"],
-        "seasonal_baseline_daily_mm": weather_data["seasonal_baseline_daily_mm"],
-        "is_mock": weather_data["is_mock"],
-    }
-
-
-@router.get("/compound")
-def get_compound_risk(
-    current_user: models.Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db),
-):
-    """Return compound risk with XAI explanation."""
-    # Get the latest stored risk score
-    latest = db.query(models.RiskScore).filter(
-        models.RiskScore.farmer_id == current_user.id
-    ).order_by(models.RiskScore.computed_at.desc()).first()
-
-    if not latest:
-        raise OnboardingIncompleteError("risk score computation")
-
-    # Parse factor breakdowns
-    financial_factors = []
-    disaster_factors = {}
-    if latest.financial_factors_json:
+    location_meta = None
+    
+    if pincode and not (latitude and longitude):
         try:
-            financial_factors = json.loads(latest.financial_factors_json)
-        except Exception:
-            pass
-    if latest.disaster_factors_json:
-        try:
-            disaster_factors = json.loads(latest.disaster_factors_json)
-        except Exception:
-            pass
+            loc = geocode_service.resolve_pincode(db, pincode)
+            latitude = loc["latitude"]
+            longitude = loc["longitude"]
+            location_meta = loc
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Failed to geocode pincode: {str(e)}")
 
+    try:
+        result = disaster_risk_service.calculate_hazard_scores(latitude, longitude)
+        result["resolved_location"] = location_meta
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch disaster forecast: {str(e)}")
+
+@router.post("/combined", response_model=CombinedRiskOutput)
+def calculate_combined_risk(input_data: CombinedRiskInput, db: Session = Depends(get_db)):
+    """Calculate both scores, combine them, and persist to the database."""
+    # 1. Financial
+    fin_result = financial_risk_service.calculate_risk(
+        loan_amount=input_data.loan_amount,
+        land_acres=input_data.land_acres,
+        has_insurance=input_data.has_insurance,
+        has_recent_loss=input_data.has_recent_loss,
+        income_bracket=input_data.income_bracket
+    )
+    
+    # 2. Geocode & Disaster
+    try:
+        loc = geocode_service.resolve_pincode(db, input_data.pincode)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to geocode pincode: {str(e)}")
+        
+    try:
+        dis_result = disaster_risk_service.calculate_hazard_scores(loc["latitude"], loc["longitude"])
+        dis_result["resolved_location"] = loc
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch disaster forecast: {str(e)}")
+        
+    # 3. Combine
+    fin_score = fin_result["financial_risk_score"]
+    dis_score = dis_result["disaster_risk_score"]
+    
+    overall_score = 0.55 * fin_score + 0.45 * dis_score
+    overall_score = round(overall_score, 2)
+    
+    if overall_score < 25:
+        band = "Low Risk"
+    elif overall_score < 50:
+        band = "Moderate Risk"
+    elif overall_score < 75:
+        band = "High Risk"
+    else:
+        band = "Severe Risk"
+        
+    # 4. Persist Assessment
+    assessment = FarmerRiskAssessment(
+        loan_amount=input_data.loan_amount,
+        land_acres=input_data.land_acres,
+        has_insurance=input_data.has_insurance,
+        has_recent_loss=input_data.has_recent_loss,
+        income_bracket=input_data.income_bracket,
+        pincode=input_data.pincode,
+        latitude=loc["latitude"],
+        longitude=loc["longitude"],
+        financial_risk_score=fin_score,
+        disaster_risk_score=dis_score,
+        dominant_hazard=dis_result["dominant_hazard"],
+        overall_risk_score=overall_score
+    )
+    db.add(assessment)
+    db.commit()
+    
     return {
-        "compound_risk": latest.compound_risk,
-        "compound_label": latest.compound_label,
-        "financial_risk": latest.financial_risk,
-        "disaster_risk": latest.disaster_risk,
-        "xai_explanation": latest.xai_explanation,
-        "financial_factors": financial_factors,
-        "disaster_factors": disaster_factors,
-        "computed_at": latest.computed_at.isoformat(),
+        "overall_risk_score": overall_score,
+        "risk_band": band,
+        "financial_risk_score": fin_score,
+        "disaster_risk": dis_result
     }
-
-
-@router.get("/history")
-def get_risk_history(
-    current_user: models.Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db),
-):
-    """Return historical risk scores for trend charts."""
-    history = db.query(models.RiskScore).filter(
-        models.RiskScore.farmer_id == current_user.id
-    ).order_by(models.RiskScore.computed_at.desc()).limit(30).all()
-
-    return [
-        {
-            "id": r.id,
-            "financial_risk": r.financial_risk,
-            "disaster_risk": r.disaster_risk,
-            "compound_risk": r.compound_risk,
-            "compound_label": r.compound_label,
-            "computed_at": r.computed_at.isoformat(),
-        }
-        for r in history
-    ]

@@ -10,10 +10,46 @@ from app.db.database import get_db
 from app.db import models
 from app.deps import get_current_farmer
 from app.services.weather import get_weather_and_disaster
-from app.services.agents import FinancialAgent, DisasterAgent, GovSchemeAgent, compute_compound_risk
+from app.services.agents import GovSchemeAgent
+from app.services.financial_risk import financial_risk_service
+from app.services.disaster_risk import disaster_risk_service
+from app.services.geocode import geocode_service
 from app.services.recommendations import generate_recommendations
 from app import schemas
 from app.errors import OnboardingIncompleteError
+
+
+def _income_band_to_bracket(band: str) -> int:
+    """Convert income band string to integer bracket for ML model."""
+    mapping = {"<1L": 0, "1-3L": 1, "3-5L": 2, "5L+": 3}
+    return mapping.get(band, 0)
+
+
+def _compute_compound_risk(financial_score: float, disaster_score: float):
+    """New compound risk: 55% financial + 45% disaster."""
+    compound = round(0.55 * financial_score + 0.45 * disaster_score, 1)
+    if compound < 25:
+        label = "Stable"
+    elif compound < 50:
+        label = "Watch"
+    elif compound < 75:
+        label = "High Risk"
+    else:
+        label = "Critical"
+    xai = (
+        f"Your compound risk is {compound}%. "
+        f"Financial vulnerability contributes {round(0.55 * financial_score, 1)}% "
+        f"and disaster exposure contributes {round(0.45 * disaster_score, 1)}%. "
+    )
+    if compound >= 75:
+        xai += "Both financial fragility and environmental threats are critically elevated. Immediate action is recommended."
+    elif compound >= 50:
+        xai += "There is significant overlap between financial stress and weather-related hazards. Review your insurance and loan situation."
+    elif compound >= 25:
+        xai += "Moderate risk detected. Monitor weather forecasts closely and ensure your insurance coverage is active."
+    else:
+        xai += "Your current risk profile is manageable. Continue good practices."
+    return {"compound_risk": compound, "label": label, "xai_explanation": xai}
 
 router = APIRouter(prefix="/api/farmer", tags=["Farmer"])
 
@@ -97,31 +133,58 @@ def onboarding_step3(
 
     crop = farm.crops.split(",")[0].strip() if farm.crops else "Rice"
 
-    # ── Agent 1: Financial Risk ──
-    fin_agent = FinancialAgent()
-    fin_result = fin_agent.run(
+    # ── New ML Financial Risk ──
+    income_bracket = _income_band_to_bracket(fin.income_band)
+    fin_result = financial_risk_service.calculate_risk(
+        loan_amount=fin.loan_amount or 0,
+        land_acres=farm.land_size_acres,
         has_insurance=fin.has_insurance,
-        loan_source=fin.loan_source,
-        land_size_acres=farm.land_size_acres,
-        ownership_type=farm.ownership_type,
-        past_crop_loss=fin.past_crop_loss,
-        dependents=fin.dependents,
-        income_band=fin.income_band,
-        crop=crop,
+        has_recent_loss=fin.past_crop_loss,
+        income_bracket=income_bracket,
     )
+    fin_score = fin_result["financial_risk_score"]
+    fin_band = fin_result["risk_band"]
 
-    # ── Agent 2: Weather + Disaster Risk ──
+    # ── New Weather-Based Disaster Risk ──
     lat = current_user.latitude or 28.61
     lon = current_user.longitude or 77.20
-    weather_data = get_weather_and_disaster(lat, lon, current_user.pin_code, crop)
 
-    dis_agent = DisasterAgent()
-    dis_result = dis_agent.run(weather_data["disaster"], crop)
+    # Try geocoding from pincode if no coords
+    if not current_user.latitude or not current_user.longitude:
+        try:
+            loc = geocode_service.resolve_pincode(db, current_user.pin_code)
+            lat = loc["latitude"]
+            lon = loc["longitude"]
+            current_user.latitude = lat
+            current_user.longitude = lon
+        except Exception:
+            pass  # Fall back to default Delhi coords
+
+    try:
+        dis_result = disaster_risk_service.calculate_hazard_scores(lat, lon)
+    except Exception:
+        dis_result = {"disaster_risk_score": 0, "dominant_hazard": "unknown", "breakdown": {"flood": 0, "drought": 0, "storm": 0, "frost_or_heat": 0}}
+    dis_score = dis_result["disaster_risk_score"]
 
     # ── Compound Risk ──
-    compound = compute_compound_risk(fin_result["risk_score"], dis_result["risk_score"])
+    compound = _compute_compound_risk(fin_score, dis_score)
 
-    # ── Agent 3: Government Schemes ──
+    # Build factors for backward-compatible JSON storage
+    fin_factors = [
+        {"factor": f"Loan Amount: Rs.{fin.loan_amount or 0:,.0f}", "points": round(fin_score * 0.3, 1)},
+        {"factor": f"Land: {farm.land_size_acres} acres", "points": round(-1.2 * farm.land_size_acres, 1)},
+        {"factor": f"Insurance: {'Yes' if fin.has_insurance else 'No'}", "points": -13 if fin.has_insurance else 13},
+        {"factor": f"Recent Loss: {'Yes' if fin.past_crop_loss else 'No'}", "points": 18 if fin.past_crop_loss else 0},
+        {"factor": f"Income Band: {fin.income_band}", "points": round(-6.7 * income_bracket, 1)},
+    ]
+    dis_signals = dis_result["breakdown"]
+    dis_signals["dominant_hazard"] = dis_result["dominant_hazard"]
+
+    # Map to risk levels for scheme matching
+    fin_risk_level = "High" if fin_score >= 50 else ("Medium" if fin_score >= 25 else "Low")
+    dis_risk_level = "High" if dis_score >= 50 else ("Medium" if dis_score >= 25 else "Low")
+
+    # ── Government Schemes ──
     scheme_agent = GovSchemeAgent()
     schemes = scheme_agent.run(
         land_size_acres=farm.land_size_acres,
@@ -130,15 +193,28 @@ def onboarding_step3(
         loan_source=fin.loan_source,
         income_band=fin.income_band,
         past_crop_loss=fin.past_crop_loss,
-        financial_risk_level=fin_result["risk_level"],
-        disaster_risk_level=dis_result["risk_level"],
+        financial_risk_level=fin_risk_level,
+        disaster_risk_level=dis_risk_level,
         crop=crop,
     )
 
     # ── Recommendations ──
+    # Build a disaster_signals dict compatible with old recommendation format
+    compat_disaster_signals = {
+        "disaster_risk": dis_score,
+        "drought_signal": dis_result["breakdown"].get("drought", 0),
+        "flood_signal": dis_result["breakdown"].get("flood", 0),
+        "heat_signal": dis_result["breakdown"].get("frost_or_heat", 0),
+        "hazard_type": dis_result["dominant_hazard"],
+        "forecast_total_mm": 0,
+        "seasonal_normal_mm": 0,
+        "rainfall_ratio": 1.0,
+        "max_consecutive_hot_days": 0,
+        "crop_heat_threshold": 36,
+    }
     recs = generate_recommendations(
-        financial_risk=fin_result["risk_score"],
-        disaster_risk=dis_result["risk_score"],
+        financial_risk=fin_score,
+        disaster_risk=dis_score,
         compound_risk=compound["compound_risk"],
         compound_label=compound["label"],
         has_insurance=fin.has_insurance,
@@ -147,20 +223,20 @@ def onboarding_step3(
         income_band=fin.income_band,
         past_crop_loss=fin.past_crop_loss,
         ownership_type=farm.ownership_type,
-        disaster_signals=weather_data["disaster"],
+        disaster_signals=compat_disaster_signals,
         crop=crop,
     )
 
     # ── Store Risk Score (historical) ──
     risk_record = models.RiskScore(
         farmer_id=current_user.id,
-        financial_risk=fin_result["risk_score"],
-        disaster_risk=dis_result["risk_score"],
+        financial_risk=fin_score,
+        disaster_risk=dis_score,
         compound_risk=compound["compound_risk"],
         compound_label=compound["label"],
         xai_explanation=compound["xai_explanation"],
-        financial_factors_json=json.dumps(fin_result["factors"]),
-        disaster_factors_json=json.dumps(dis_result["signals"]),
+        financial_factors_json=json.dumps(fin_factors),
+        disaster_factors_json=json.dumps(dis_signals),
         eligible_schemes_json=json.dumps(schemes),
     )
     db.add(risk_record)
@@ -178,12 +254,12 @@ def onboarding_step3(
     db.refresh(risk_record)
 
     return {
-        "message": "Profile complete — risk analysis computed",
+        "message": "Profile complete — risk analysis computed (ML + Weather model)",
         "step": 3,
         "risk_score_id": risk_record.id,
         "compound_risk": compound,
-        "financial_risk": fin_result,
-        "disaster_risk": dis_result,
+        "financial_risk": {"risk_score": fin_score, "risk_band": fin_band, "factors": fin_factors},
+        "disaster_risk": {"risk_score": dis_score, "breakdown": dis_result["breakdown"], "dominant_hazard": dis_result["dominant_hazard"]},
     }
 
 
@@ -401,42 +477,69 @@ def recompute_risk(
 
     crop = farm.crops.split(",")[0].strip() if farm.crops else "Rice"
 
-    # Re-run agents
-    fin_agent = FinancialAgent()
-    fin_result = fin_agent.run(
-        has_insurance=fin.has_insurance, loan_source=fin.loan_source,
-        land_size_acres=farm.land_size_acres, ownership_type=farm.ownership_type,
-        past_crop_loss=fin.past_crop_loss, dependents=fin.dependents,
-        income_band=fin.income_band, crop=crop,
+    # ── New ML Financial Risk ──
+    income_bracket = _income_band_to_bracket(fin.income_band)
+    fin_result = financial_risk_service.calculate_risk(
+        loan_amount=fin.loan_amount or 0,
+        land_acres=farm.land_size_acres,
+        has_insurance=fin.has_insurance,
+        has_recent_loss=fin.past_crop_loss,
+        income_bracket=income_bracket,
     )
+    fin_score = fin_result["financial_risk_score"]
 
+    # ── New Weather-Based Disaster Risk ──
     lat = current_user.latitude or 28.61
     lon = current_user.longitude or 77.20
-    weather_data = get_weather_and_disaster(lat, lon, current_user.pin_code, crop)
+    if not current_user.latitude or not current_user.longitude:
+        try:
+            loc = geocode_service.resolve_pincode(db, current_user.pin_code)
+            lat = loc["latitude"]
+            lon = loc["longitude"]
+            current_user.latitude = lat
+            current_user.longitude = lon
+        except Exception:
+            pass
 
-    dis_agent = DisasterAgent()
-    dis_result = dis_agent.run(weather_data["disaster"], crop)
+    try:
+        dis_result = disaster_risk_service.calculate_hazard_scores(lat, lon)
+    except Exception:
+        dis_result = {"disaster_risk_score": 0, "dominant_hazard": "unknown", "breakdown": {"flood": 0, "drought": 0, "storm": 0, "frost_or_heat": 0}}
+    dis_score = dis_result["disaster_risk_score"]
 
-    compound = compute_compound_risk(fin_result["risk_score"], dis_result["risk_score"])
+    compound = _compute_compound_risk(fin_score, dis_score)
+
+    fin_factors = [
+        {"factor": f"Loan Amount: Rs.{fin.loan_amount or 0:,.0f}", "points": round(fin_score * 0.3, 1)},
+        {"factor": f"Land: {farm.land_size_acres} acres", "points": round(-1.2 * farm.land_size_acres, 1)},
+        {"factor": f"Insurance: {'Yes' if fin.has_insurance else 'No'}", "points": -13 if fin.has_insurance else 13},
+        {"factor": f"Recent Loss: {'Yes' if fin.past_crop_loss else 'No'}", "points": 18 if fin.past_crop_loss else 0},
+        {"factor": f"Income Band: {fin.income_band}", "points": round(-6.7 * income_bracket, 1)},
+    ]
+    dis_signals = dis_result["breakdown"]
+    dis_signals["dominant_hazard"] = dis_result["dominant_hazard"]
+
+    fin_risk_level = "High" if fin_score >= 50 else ("Medium" if fin_score >= 25 else "Low")
+    dis_risk_level = "High" if dis_score >= 50 else ("Medium" if dis_score >= 25 else "Low")
 
     scheme_agent = GovSchemeAgent()
     schemes = scheme_agent.run(
         land_size_acres=farm.land_size_acres, ownership_type=farm.ownership_type,
         has_insurance=fin.has_insurance, loan_source=fin.loan_source,
         income_band=fin.income_band, past_crop_loss=fin.past_crop_loss,
-        financial_risk_level=fin_result["risk_level"],
-        disaster_risk_level=dis_result["risk_level"], crop=crop,
+        financial_risk_level=fin_risk_level,
+        disaster_risk_level=dis_risk_level, crop=crop,
     )
 
     risk_record = models.RiskScore(
         farmer_id=current_user.id,
-        financial_risk=fin_result["risk_score"],
-        disaster_risk=dis_result["risk_score"],
+        financial_risk=fin_score,
+        disaster_risk=dis_score,
         compound_risk=compound["compound_risk"],
         compound_label=compound["label"],
         xai_explanation=compound["xai_explanation"],
-        financial_factors_json=json.dumps(fin_result["factors"]),
-        disaster_factors_json=json.dumps(dis_result["signals"]),
+        financial_factors_json=json.dumps(fin_factors),
+        disaster_factors_json=json.dumps(dis_signals),
         eligible_schemes_json=json.dumps(schemes),
     )
     db.add(risk_record)
@@ -444,8 +547,8 @@ def recompute_risk(
     db.refresh(risk_record)
 
     return {
-        "message": "Risk recomputed",
+        "message": "Risk recomputed (ML + Weather model)",
         "compound_risk": compound,
-        "financial_risk": fin_result,
-        "disaster_risk": dis_result,
+        "financial_risk": {"risk_score": fin_score, "risk_band": fin_result["risk_band"]},
+        "disaster_risk": {"risk_score": dis_score, "breakdown": dis_result["breakdown"], "dominant_hazard": dis_result["dominant_hazard"]},
     }

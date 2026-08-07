@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../../components/Navbar/Navbar';
 import { getRiskBandColor, getRiskBandBg } from '../../types';
+import PinLocation from '../../components/PinLocation';
 
 import { API_URL } from '../../config';
 
@@ -487,9 +488,11 @@ export default function OfficerView() {
                     ) : (
                       filteredFarmers.map((f: any) => (
                         <tr key={f.id} className="hover:bg-slate-50/50 transition">
-                          <td className="px-4 py-3 font-semibold text-slate-800">{f.full_name}</td>
-                          <td className="px-4 py-3 font-mono">{f.pin_code}</td>
-                          <td className="px-4 py-3">{f.primary_crop || '—'}</td>
+                          <td className="px-4 py-3">
+                          <div className="font-medium text-gray-900">{f.full_name}</div>
+                        </td>
+                        <td className="px-4 py-3 font-mono"><PinLocation pin={f.pin_code} /></td>
+                        <td className="px-4 py-3">{f.primary_crop || '—'}</td>
                           <td className="px-4 py-3">{f.land_size_acres ? `${f.land_size_acres} ac` : '—'}</td>
                           <td className="px-4 py-3 text-center font-bold text-slate-700">{f.financial_risk ?? '—'}</td>
                           <td className="px-4 py-3 text-center font-bold text-slate-700">{f.disaster_risk ?? '—'}</td>

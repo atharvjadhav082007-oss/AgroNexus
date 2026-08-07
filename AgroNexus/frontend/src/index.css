@@ -248,3 +248,23 @@ h1, h2, h3, h4, h5, h6 {
   background: #43A047;
 }
 
+
+/* Google Translate Customization */
+body { top: 0 !important; }
+.skiptranslate iframe { display: none !important; }
+#google_translate_element select { padding: 6px 12px; border-radius: 9999px; border: 1px solid #2E7D32; background-color: #F0FBF1; color: #2E7D32; font-weight: 700; font-size: 14px; cursor: pointer; outline: none; transition: all 0.2s; appearance: none; padding-right: 24px; background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="%232E7D32"%3E%3Cpath stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"%3E%3C/path%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; }
+#google_translate_element select:hover { background-color: #D7F0D7; }
+.goog-te-gadget { font-size: 0 !important; color: transparent !important; }
+.goog-te-gadget img { display: none !important; }
+.goog-te-banner-frame { display: none !important; }
+body { top: 0 !important; }
+
+/* Force hide all Google Translate floating elements */
+#goog-gt-tt, .goog-te-balloon-frame { display: none !important; }
+.goog-text-highlight { background: none !important; box-shadow: none !important; }
+.skiptranslate > iframe.goog-te-banner-frame { display: none !important; }
+iframe.goog-te-menu-frame { display: none !important; }
+/* Hide the new floating circular widget */
+.VIpgJd-Zvi9od-aZ2wEe-wOHMyf { display: none !important; }
+.VIpgJd-Zvi9od-aZ2wEe-wOHMyf-ti6hGc { display: none !important; }
+
